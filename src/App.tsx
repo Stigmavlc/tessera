@@ -963,15 +963,13 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   };
 
   const toggleViewMode = () => {
-    setViewMode((current) => {
-      const next = current === "locked" ? "free" : "locked";
-      if (next === "free") {
-        setGroupPositions(clonePositions(lockedLayout.positions));
-        setBoardCamera(lockedLayout.camera);
-      }
-      localStorage.setItem("tessera.viewMode", next);
-      return next;
-    });
+    const next = viewMode === "locked" ? "free" : "locked";
+    if (next === "free") {
+      setGroupPositions(clonePositions(lockedLayout.positions));
+      setBoardCamera(lockedLayout.camera);
+    }
+    localStorage.setItem("tessera.viewMode", next);
+    setViewMode(next);
   };
 
   const resetGame = () => {
@@ -1244,14 +1242,16 @@ function BoardDropZone({
   useEffect(() => {
     cameraRef.current = camera;
     if (viewMode === "locked") {
-      animate(cameraX, camera.x, { type: "spring", stiffness: 170, damping: 26 });
-      animate(cameraY, camera.y, { type: "spring", stiffness: 170, damping: 26 });
-      animate(cameraZoom, camera.zoom, { type: "spring", stiffness: 170, damping: 26 });
-    } else {
-      cameraX.set(camera.x);
-      cameraY.set(camera.y);
-      cameraZoom.set(camera.zoom);
+      const controls = [
+        animate(cameraX, camera.x, { type: "spring", stiffness: 170, damping: 26 }),
+        animate(cameraY, camera.y, { type: "spring", stiffness: 170, damping: 26 }),
+        animate(cameraZoom, camera.zoom, { type: "spring", stiffness: 170, damping: 26 }),
+      ];
+      return () => controls.forEach((control) => control.stop());
     }
+    cameraX.set(camera.x);
+    cameraY.set(camera.y);
+    cameraZoom.set(camera.zoom);
   }, [camera, viewMode, cameraX, cameraY, cameraZoom]);
 
   useEffect(() => {
