@@ -477,11 +477,11 @@ function HomeScreen({ onPlay }: { onPlay: () => void }) {
           <span className="active-game__meta">3 players</span>
         </div>
         <div className="home-players">
-          <div className="home-player"><Avatar initials="M" tone="terra" /><span>Maya</span></div>
+          <div className="home-player home-player--you"><Avatar initials={localPlayerInitial} tone="olive" active /><span>{localPlayerName}</span></div>
           <span className="player-divider" aria-hidden="true">◆</span>
           <div className="home-player"><Avatar initials="L" tone="blue" /><span>Leo</span></div>
           <span className="player-divider" aria-hidden="true">◆</span>
-          <div className="home-player home-player--you"><Avatar initials={localPlayerInitial} tone="olive" active /><span>{localPlayerName}</span></div>
+          <div className="home-player"><Avatar initials="M" tone="terra" /><span>Maya</span></div>
         </div>
       </section>
 
@@ -562,7 +562,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       Leo: opponentRacks.Leo,
     };
     const scores = endedByStalemate ? scoreStalemate(racks).scores : scoreRound(winner, racks);
-    const players: Winner[] = ["You", "Maya", "Leo"];
+    const players: Winner[] = ["You", "Leo", "Maya"];
     return players.map((player) => ({
       player,
       tiles: racks[player].length,
@@ -1143,9 +1143,9 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       </header>
 
       <section className="player-rail" aria-label="Players">
-        <div className={`rail-player ${turnState === "opponent" && activeOpponent === "Maya" ? "rail-player--active" : ""}`}><Avatar initials="M" tone="terra" active={turnState === "opponent" && activeOpponent === "Maya"} /><span><strong>Maya</strong><em>{opponentRacks.Maya.length} tiles</em></span></div>
-        <div className={`rail-player ${turnState === "opponent" && activeOpponent === "Leo" ? "rail-player--active" : ""}`}><Avatar initials="L" tone="blue" active={turnState === "opponent" && activeOpponent === "Leo"} /><span><strong>Leo</strong><em>{opponentRacks.Leo.length} tiles</em></span></div>
         <div className={`rail-player ${turnState === "you" ? "rail-player--active" : ""}`}><Avatar initials={localPlayerInitial} tone="olive" active={turnState === "you"} /><span><strong>{localPlayerName}</strong><em>{rack.length} tiles</em></span></div>
+        <div className={`rail-player ${turnState === "opponent" && activeOpponent === "Leo" ? "rail-player--active" : ""}`}><Avatar initials="L" tone="blue" active={turnState === "opponent" && activeOpponent === "Leo"} /><span><strong>Leo</strong><em>{opponentRacks.Leo.length} tiles</em></span></div>
+        <div className={`rail-player ${turnState === "opponent" && activeOpponent === "Maya" ? "rail-player--active" : ""}`}><Avatar initials="M" tone="terra" active={turnState === "opponent" && activeOpponent === "Maya"} /><span><strong>Maya</strong><em>{opponentRacks.Maya.length} tiles</em></span></div>
       </section>
 
       <DndContext sensors={sensors} collisionDetection={tabletopCollision} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
