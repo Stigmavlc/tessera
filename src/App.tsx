@@ -23,7 +23,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AnimatePresence, motion, useMotionValue } from "framer-motion";
+import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
 import {
   BoardGroup,
   Deal,
@@ -42,7 +42,7 @@ import {
   scoreRound,
   validateTurn,
 } from "./game";
-import { BoardCamera, TablePoint, TablePositions, groupFootprint } from "./layout";
+import { BoardCamera, TablePoint, TablePositions, groupFootprint, layoutLockedBoard } from "./layout";
 
 type Screen = "home" | "game";
 type TurnState = "you" | "opponent";
@@ -472,6 +472,9 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   const [groupPositions, setGroupPositions] = useState<TablePositions>({});
   const [turnStartPositions, setTurnStartPositions] = useState<TablePositions>({});
   const [boardCamera, setBoardCamera] = useState<BoardCamera>(defaultCamera);
+  const [viewMode, setViewMode] = useState<"locked" | "free">(() =>
+    localStorage.getItem("tessera.viewMode") === "free" ? "free" : "locked");
+  const [stageSize, setStageSize] = useState({ width: 390, height: 480 });
   const [timer, setTimer] = useState(60);
   const [turnState, setTurnState] = useState<TurnState>("you");
   const [activeOpponent, setActiveOpponent] = useState<OpponentName>("Leo");
@@ -491,9 +494,13 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   const boardHasIllegalDraft = board.some((group) => !analyzeMeld(group.tiles).valid);
   const boardIsEmpty = board.every((group) => group.tiles.length === 0);
   const visibleBoard = board.filter((group) => group.tiles.length > 0);
+  const lockedLayout = useMemo(
+    () => layoutLockedBoard(board, stageSize),
+    [board, stageSize],
+  );
   const layoutPositions = useMemo(
-    () => positionTableGroups(board, groupPositions),
-    [board, groupPositions],
+    () => viewMode === "locked" ? lockedLayout.positions : positionTableGroups(board, groupPositions),
+    [viewMode, lockedLayout, board, groupPositions],
   );
   const rackColumns = Math.max(7, Math.ceil(rack.length / 2));
   const returnableTileIds = useMemo(
@@ -955,6 +962,18 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     handleEndTurn();
   };
 
+  const toggleViewMode = () => {
+    setViewMode((current) => {
+      const next = current === "locked" ? "free" : "locked";
+      if (next === "free") {
+        setGroupPositions(clonePositions(lockedLayout.positions));
+        setBoardCamera(lockedLayout.camera);
+      }
+      localStorage.setItem("tessera.viewMode", next);
+      return next;
+    });
+  };
+
   const resetGame = () => {
     const nextDeal = createDeal();
     setDeal(nextDeal);
@@ -1010,15 +1029,20 @@ function GameScreen({ onBack }: { onBack: () => void }) {
         <BoardDropZone
           empty={boardIsEmpty}
           onTableTap={handleTableTap}
-          camera={boardCamera}
+          camera={viewMode === "locked" ? lockedLayout.camera : boardCamera}
           onCameraChange={setBoardCamera}
+          viewMode={viewMode}
+          onToggleViewMode={toggleViewMode}
+          onMeasure={setStageSize}
           world={visibleBoard.map((group) => {
             const position = layoutPositions[group.id] ?? { x: 50, y: 50 };
             return (
-              <div
+              <motion.div
                 className="meld-position"
                 key={group.id}
-                style={{ left: `${position.x}%`, top: `${position.y}%` }}
+                initial={false}
+                animate={{ left: `${position.x}%`, top: `${position.y}%` }}
+                transition={{ type: "spring", stiffness: 260, damping: 28 }}
               >
                 <DroppableGroup
                   group={group}
@@ -1029,7 +1053,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
                   returnableTileIds={turnState === "you" ? returnableTileIds : new Set<string>()}
                   onReturnTile={(tileId, groupId) => returnTilesToRack([tileId], groupId)}
                 />
-              </div>
+              </motion.div>
             );
           })}
         >
@@ -1183,6 +1207,9 @@ function BoardDropZone({
   onTableTap,
   camera,
   onCameraChange,
+  viewMode,
+  onToggleViewMode,
+  onMeasure,
 }: {
   children: React.ReactNode;
   world: React.ReactNode;
@@ -1190,8 +1217,12 @@ function BoardDropZone({
   onTableTap: (position: TablePoint) => void;
   camera: BoardCamera;
   onCameraChange: (camera: BoardCamera) => void;
+  viewMode: "locked" | "free";
+  onToggleViewMode: () => void;
+  onMeasure: (size: { width: number; height: number }) => void;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: "board-drop", data: { type: "board" } });
+  const stageRef = useRef<HTMLElement | null>(null);
   const cameraX = useMotionValue(camera.x);
   const cameraY = useMotionValue(camera.y);
   const cameraZoom = useMotionValue(camera.zoom);
@@ -1212,10 +1243,27 @@ function BoardDropZone({
 
   useEffect(() => {
     cameraRef.current = camera;
-    cameraX.set(camera.x);
-    cameraY.set(camera.y);
-    cameraZoom.set(camera.zoom);
-  }, [camera, cameraX, cameraY, cameraZoom]);
+    if (viewMode === "locked") {
+      animate(cameraX, camera.x, { type: "spring", stiffness: 170, damping: 26 });
+      animate(cameraY, camera.y, { type: "spring", stiffness: 170, damping: 26 });
+      animate(cameraZoom, camera.zoom, { type: "spring", stiffness: 170, damping: 26 });
+    } else {
+      cameraX.set(camera.x);
+      cameraY.set(camera.y);
+      cameraZoom.set(camera.zoom);
+    }
+  }, [camera, viewMode, cameraX, cameraY, cameraZoom]);
+
+  useEffect(() => {
+    const element = stageRef.current;
+    if (!element) return;
+    const report = () => onMeasure({ width: element.clientWidth, height: element.clientHeight });
+    report();
+    const observer = new ResizeObserver(report);
+    observer.observe(element);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => () => {
     if (wheelCommitRef.current !== null) window.clearTimeout(wheelCommitRef.current);
@@ -1262,6 +1310,7 @@ function BoardDropZone({
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (viewMode === "locked") return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     const target = event.target as HTMLElement;
     if (pointersRef.current.size === 0 && target.closest(".meld-position, .board-fit-button")) return;
@@ -1284,6 +1333,7 @@ function BoardDropZone({
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLElement>) => {
+    if (viewMode === "locked") return;
     if (!pointersRef.current.has(event.pointerId)) return;
     event.preventDefault();
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -1344,6 +1394,7 @@ function BoardDropZone({
   };
 
   const handleWheel = (event: React.WheelEvent<HTMLElement>) => {
+    if (viewMode === "locked") return;
     event.preventDefault();
     const rect = event.currentTarget.getBoundingClientRect();
     const current = cameraRef.current;
@@ -1376,7 +1427,7 @@ function BoardDropZone({
 
   return (
     <section
-      ref={setNodeRef}
+      ref={(node) => { setNodeRef(node); stageRef.current = node; }}
       className={`board-stage ${empty ? "board-stage--empty" : ""} ${isOver ? "board-stage--over" : ""}`}
       aria-label="Game table. Tap to place selected tiles, drag empty felt to move, and pinch or use the mouse wheel to zoom"
       onPointerDown={handlePointerDown}
@@ -1407,20 +1458,36 @@ function BoardDropZone({
       >
         {world}
       </motion.div>
+      {viewMode === "free" && (
+        <button
+          className="board-fit-button"
+          type="button"
+          aria-label="Fit the whole table in view"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            fitBoard(event.currentTarget.closest<HTMLElement>(".board-stage")!);
+          }}
+        >
+          <svg viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M7 3H3v4M13 3h4v4M17 13v4h-4M7 17H3v-4" />
+          </svg>
+          <span>Fit</span>
+        </button>
+      )}
       <button
-        className="board-fit-button"
+        className="board-lock-button"
         type="button"
-        aria-label="Fit the whole table in view"
+        aria-label={viewMode === "locked" ? "Unlock the table view" : "Lock the table view"}
         onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.stopPropagation();
-          fitBoard(event.currentTarget.closest<HTMLElement>(".board-stage")!);
-        }}
+        onClick={(event) => { event.stopPropagation(); onToggleViewMode(); }}
       >
         <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path d="M7 3H3v4M13 3h4v4M17 13v4h-4M7 17H3v-4" />
+          {viewMode === "locked"
+            ? <path d="M6 9V6a4 4 0 1 1 8 0v3M5 9h10v7H5z" />
+            : <path d="M6 9V6a4 4 0 0 1 7.6-1.6M5 9h10v7H5z" />}
         </svg>
-        <span>Fit</span>
+        <span>{viewMode === "locked" ? "Locked" : "Free"}</span>
       </button>
     </section>
   );
