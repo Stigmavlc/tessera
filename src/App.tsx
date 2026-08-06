@@ -706,7 +706,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
         .filter((group) => group.id === "new-meld" || group.tiles.length > 0);
       setBoard(nextBoard);
       setGroupPositions((current) => positionTableGroups(nextBoard, current));
-      setMoveCount((value) => value + tileIds.length);
+      setMoveCount((value) => value + 1);
       return;
     }
     const tileId = tileIds[0];
@@ -744,7 +744,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
 
     if (movingTiles.length === source.tiles.length) {
       setGroupPositions((current) => positionTableGroups(board, { ...current, [fromGroupId]: position }));
-      setMoveCount((value) => value + movingTiles.length);
+      setMoveCount((value) => value + 1);
       return;
     }
 
@@ -761,7 +761,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     ];
     setBoard(nextBoard);
     setGroupPositions((current) => positionTableGroups(nextBoard, { ...current, [groupId]: position }));
-    setMoveCount((value) => value + movingTiles.length);
+    setMoveCount((value) => value + 1);
   };
 
   const returnTilesToRack = (tileIds: string[], fromGroupId: string) => {
