@@ -23,6 +23,8 @@ import {
   resolveTileDrop,
   scoreRound,
   seededRng,
+  sortRackByGroups,
+  sortRackByRuns,
   tile,
   validateTurn,
 } from "./game";
@@ -434,5 +436,28 @@ describe("moveBoardTiles", () => {
     expect(moveBoardTiles(board(), ["b7", "b8"], "a", "a", 0)).toEqual(board());
     const reordered = moveBoardTiles(board(), ["b7"], "a", "a", 0);
     expect(reordered.find((entry) => entry.id === "a")?.tiles.map((entry) => entry.value)).toEqual([4, 5, 6, 7, 8]);
+  });
+});
+
+describe("rack sorting", () => {
+  const rack = [
+    tile("y5", 5, "marigold"), tile("joker-a", "★", "joker"), tile("r3", 3, "terracotta"),
+    tile("b5", 5, "cobalt"), tile("r5", 5, "terracotta"), tile("b2", 2, "cobalt"),
+  ];
+
+  it("777 clusters same numbers across colors, jokers last", () => {
+    expect(sortRackByGroups(rack).map((entry) => entry.id))
+      .toEqual(["b2", "r3", "r5", "b5", "y5", "joker-a"]);
+  });
+
+  it("789 clusters colors into ascending runs, jokers last", () => {
+    expect(sortRackByRuns(rack).map((entry) => entry.id))
+      .toEqual(["r3", "r5", "b2", "b5", "y5", "joker-a"]);
+  });
+
+  it("does not mutate the input", () => {
+    const before = rack.map((entry) => entry.id);
+    sortRackByGroups(rack);
+    expect(rack.map((entry) => entry.id)).toEqual(before);
   });
 });
