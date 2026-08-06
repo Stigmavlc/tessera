@@ -34,7 +34,7 @@ import {
   analyzeMeld,
   createDeal,
   initialBoard,
-  moveBoardTile,
+  moveBoardTiles,
   orderMeldTiles,
   playOpponentTurn,
   resolveTileDrop,
@@ -239,17 +239,21 @@ function SortableTile({ tile, selected, onSelect }: { tile: Tile; selected: bool
 function DraggableBoardTile({
   tile,
   groupId,
+  tailIds,
   returnable,
+  lifted,
   onReturn,
 }: {
   tile: Tile;
   groupId: string;
+  tailIds: string[];
   returnable: boolean;
+  lifted: boolean;
   onReturn: () => void;
 }) {
   const { attributes, listeners, setNodeRef: setDragRef, transform, isDragging } = useDraggable({
     id: tile.id,
-    data: { type: "board-tile", tile, groupId },
+    data: { type: "board-tile", tile, groupId, tailIds },
   });
   const { isOver, setNodeRef: setDropRef } = useDroppable({
     id: `board-target:${tile.id}`,
@@ -264,7 +268,7 @@ function DraggableBoardTile({
       <motion.div
         ref={setNodeRef}
         style={{ transform: CSS.Translate.toString(transform) }}
-        className={`board-tile ${isDragging ? "board-tile--dragging" : ""} ${isOver ? "board-tile--over" : ""}`}
+        className={`board-tile ${isDragging ? "board-tile--dragging" : ""} ${isOver ? "board-tile--over" : ""} ${lifted ? "board-tile--tail-lifted" : ""}`}
         aria-label={`${tile.color} ${tile.value} table tile`}
         {...attributes}
         {...listeners}
@@ -292,6 +296,7 @@ function DraggableBoardTile({
 function DroppableGroup({
   group,
   activeTile,
+  activeTailIds,
   selectedTiles,
   onTap,
   returnableTileIds,
@@ -299,6 +304,7 @@ function DroppableGroup({
 }: {
   group: BoardGroup;
   activeTile: Tile | null;
+  activeTailIds: string[];
   selectedTiles: Tile[];
   onTap: (groupId: string) => void;
   returnableTileIds: Set<string>;
@@ -312,6 +318,7 @@ function DroppableGroup({
   const canReceive = activeTile !== null || selectedTiles.length > 0;
   const meldAnalysis = analyzeMeld(group.tiles);
   const isDraftInvalid = group.tiles.length > 0 && !meldAnalysis.valid;
+  const isValidRun = meldAnalysis.valid && meldAnalysis.type === "run";
   const isFourTileSet = meldAnalysis.valid && meldAnalysis.type === "set" && group.tiles.length === 4;
   const groupLabel = `${group.kind === "run" ? "Run" : "Group"} meld`;
   const lengthClass = group.tiles.length >= 11
@@ -336,7 +343,7 @@ function DroppableGroup({
       aria-label={group.tiles.length ? `${groupLabel}, ${group.tiles.length} tiles` : groupLabel}
     >
       <AnimatePresence initial={false}>
-        {group.tiles.map((entry) => (
+        {group.tiles.map((entry, index) => (
           <motion.div
             key={entry.id}
             initial={{ opacity: 0, y: 24, scale: 0.7, rotate: -8 }}
@@ -347,7 +354,9 @@ function DroppableGroup({
             <DraggableBoardTile
               tile={entry}
               groupId={group.id}
+              tailIds={isValidRun ? group.tiles.slice(index).map((tail) => tail.id) : [entry.id]}
               returnable={returnableTileIds.has(entry.id)}
+              lifted={activeTailIds.includes(entry.id) && activeTile?.id !== entry.id}
               onReturn={() => onReturnTile(entry.id, group.id)}
             />
           </motion.div>
@@ -456,6 +465,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     hasOpened: false,
   }));
   const [activeTile, setActiveTile] = useState<Tile | null>(null);
+  const [activeTailIds, setActiveTailIds] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [history, setHistory] = useState<ActionSnapshot[]>([]);
   const [moveCount, setMoveCount] = useState(0);
@@ -679,26 +689,27 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     if (haptics && "vibrate" in navigator) navigator.vibrate(14);
   };
 
-  const rearrangeTableTile = (
-    tileId: string,
+  const rearrangeTableTiles = (
+    tileIds: string[],
     fromGroupId: string,
     toGroupId: string,
     targetIndex?: number,
   ) => {
     if (turnState !== "you" || (fromGroupId === toGroupId && targetIndex === undefined)) return;
-    if (!hasOpened && !returnableTileIds.has(tileId)) {
+    if (!hasOpened && tileIds.some((id) => !returnableTileIds.has(id))) {
       setToast("Table rearrangement unlocks after your 30-point opening meld");
       return;
     }
     remember();
-    if (fromGroupId === toGroupId) {
-      const nextBoard = moveBoardTile(board, tileId, fromGroupId, toGroupId, targetIndex)
+    if (fromGroupId === toGroupId || tileIds.length > 1) {
+      const nextBoard = moveBoardTiles(board, tileIds, fromGroupId, toGroupId, targetIndex)
         .filter((group) => group.id === "new-meld" || group.tiles.length > 0);
       setBoard(nextBoard);
       setGroupPositions((current) => positionTableGroups(nextBoard, current));
-      setMoveCount((value) => value + 1);
+      setMoveCount((value) => value + tileIds.length);
       return;
     }
+    const tileId = tileIds[0];
     const movingTile = board.find((group) => group.id === fromGroupId)?.tiles
       .find((entry) => entry.id === tileId);
     if (!movingTile) return;
@@ -719,65 +730,67 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     setMoveCount((value) => value + 1);
   };
 
-  const moveTableTileToNewGroup = (tileId: string, fromGroupId: string, position: TablePoint) => {
+  const moveTableTilesToNewGroup = (tileIds: string[], fromGroupId: string, position: TablePoint) => {
     if (turnState !== "you") return;
-    if (!hasOpened && !returnableTileIds.has(tileId)) {
+    if (!hasOpened && tileIds.some((id) => !returnableTileIds.has(id))) {
       setToast("Table rearrangement unlocks after your 30-point opening meld");
       return;
     }
     const source = board.find((group) => group.id === fromGroupId);
-    const movingTile = source?.tiles.find((entry) => entry.id === tileId);
-    if (!source || !movingTile) return;
+    const idSet = new Set(tileIds);
+    const movingTiles = source?.tiles.filter((entry) => idSet.has(entry.id)) ?? [];
+    if (!source || movingTiles.length === 0) return;
     remember();
 
-    if (source.tiles.length === 1) {
+    if (movingTiles.length === source.tiles.length) {
       setGroupPositions((current) => positionTableGroups(board, { ...current, [fromGroupId]: position }));
-      setMoveCount((value) => value + 1);
+      setMoveCount((value) => value + movingTiles.length);
       return;
     }
 
-    const groupId = `split-${turnNumber}-${moveCount + 1}-${tileId}`;
+    const groupId = `split-${turnNumber}-${moveCount + 1}-${tileIds[0]}`;
     const nextBoard: BoardGroup[] = [
       ...board
         .filter((group) => group.id !== "new-meld")
         .map((group) => group.id === fromGroupId
-          ? { ...group, tiles: group.tiles.filter((entry) => entry.id !== tileId) }
+          ? { ...group, tiles: group.tiles.filter((entry) => !idSet.has(entry.id)) }
           : group)
         .filter((group) => group.tiles.length > 0),
-      { id: groupId, kind: "new", tiles: [movingTile] },
+      { id: groupId, kind: "new", tiles: movingTiles },
       { id: "new-meld", kind: "new", tiles: [] },
     ];
     setBoard(nextBoard);
     setGroupPositions((current) => positionTableGroups(nextBoard, { ...current, [groupId]: position }));
-    setMoveCount((value) => value + 1);
+    setMoveCount((value) => value + movingTiles.length);
   };
 
-  const returnTileToRack = (tileId: string, fromGroupId: string) => {
+  const returnTilesToRack = (tileIds: string[], fromGroupId: string) => {
     if (turnState !== "you") return;
-    if (!returnableTileIds.has(tileId)) {
+    if (!tileIds.every((id) => returnableTileIds.has(id))) {
       setToast("Only tiles played from your rack this turn can come back");
       return;
     }
-    const returningTile = board
+    const idSet = new Set(tileIds);
+    const returningTiles = board
       .find((group) => group.id === fromGroupId)
-      ?.tiles.find((entry) => entry.id === tileId);
-    if (!returningTile) return;
+      ?.tiles.filter((entry) => idSet.has(entry.id)) ?? [];
+    if (returningTiles.length === 0) return;
 
     remember();
     const nextBoard = board
       .map((group) => group.id === fromGroupId
-        ? { ...group, tiles: group.tiles.filter((entry) => entry.id !== tileId) }
+        ? { ...group, tiles: group.tiles.filter((entry) => !idSet.has(entry.id)) }
         : group)
       .filter((group) => group.id === "new-meld" || group.tiles.length > 0);
     setBoard(nextBoard);
     setGroupPositions((current) => positionTableGroups(nextBoard, current));
     setRack((items) => {
       const order = new Map(turnStart.rack.map((entry, index) => [entry.id, index]));
-      return [...items, returningTile].sort(
+      return [...items, ...returningTiles].sort(
         (first, second) => (order.get(first.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(second.id) ?? Number.MAX_SAFE_INTEGER),
       );
     });
-    setMoveCount((value) => Math.max(0, value - 1));
+    setMoveCount((value) => Math.max(0, value - tileIds.length));
     setSelectedIds([]);
   };
 
@@ -797,10 +810,12 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   const handleDragStart = ({ active }: DragStartEvent) => {
     const dragged = active.data.current?.tile as Tile | undefined;
     setActiveTile(dragged ?? null);
+    setActiveTailIds((active.data.current?.tailIds as string[] | undefined) ?? []);
   };
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     setActiveTile(null);
+    setActiveTailIds([]);
     if (!over || turnState !== "you") return;
     const activeId = String(active.id);
     const overId = String(over.id);
@@ -809,14 +824,17 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     const draggedRackIds = sourceType === "rack-tile" && selectedIds.includes(activeId)
       ? selectedIds
       : [activeId];
+    const draggedBoardIds = sourceType === "board-tile"
+      ? ((active.data.current?.tailIds as string[] | undefined) ?? [activeId])
+      : [];
 
     if (sourceType === "board-tile" && fromGroupId && rack.some((entry) => entry.id === overId)) {
-      returnTileToRack(activeId, fromGroupId);
+      returnTilesToRack(draggedBoardIds, fromGroupId);
       return;
     }
 
     if (overId === "rack-drop") {
-      if (sourceType === "board-tile" && fromGroupId) returnTileToRack(activeId, fromGroupId);
+      if (sourceType === "board-tile" && fromGroupId) returnTilesToRack(draggedBoardIds, fromGroupId);
       return;
     }
 
@@ -826,7 +844,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       const targetIndex = targetGroup?.tiles.findIndex((entry) => entry.id === targetTileId) ?? -1;
       if (!targetGroup || targetIndex < 0) return;
       if (sourceType === "board-tile" && fromGroupId) {
-        rearrangeTableTile(activeId, fromGroupId, targetGroup.id, targetIndex);
+        rearrangeTableTiles(draggedBoardIds, fromGroupId, targetGroup.id, targetIndex);
       } else {
         placeTiles(draggedRackIds, targetGroup.id, targetIndex);
       }
@@ -835,13 +853,13 @@ function GameScreen({ onBack }: { onBack: () => void }) {
 
     if (overId.startsWith("group:")) {
       const targetGroupId = overId.slice(6);
-      if (sourceType === "board-tile" && fromGroupId) rearrangeTableTile(activeId, fromGroupId, targetGroupId);
+      if (sourceType === "board-tile" && fromGroupId) rearrangeTableTiles(draggedBoardIds, fromGroupId, targetGroupId);
       else placeTiles(draggedRackIds, targetGroupId);
       return;
     }
     if (overId === "board-drop") {
       const position = getDropPosition(active);
-      if (sourceType === "board-tile" && fromGroupId) moveTableTileToNewGroup(activeId, fromGroupId, position);
+      if (sourceType === "board-tile" && fromGroupId) moveTableTilesToNewGroup(draggedBoardIds, fromGroupId, position);
       else placeTilesAsNewGroup(draggedRackIds, position);
       return;
     }
@@ -1005,10 +1023,11 @@ function GameScreen({ onBack }: { onBack: () => void }) {
                 <DroppableGroup
                   group={group}
                   activeTile={activeTile}
+                  activeTailIds={activeTailIds}
                   selectedTiles={selectedTiles}
                   onTap={handleGroupTap}
                   returnableTileIds={turnState === "you" ? returnableTileIds : new Set<string>()}
-                  onReturnTile={returnTileToRack}
+                  onReturnTile={(tileId, groupId) => returnTilesToRack([tileId], groupId)}
                 />
               </div>
             );
@@ -1071,9 +1090,11 @@ function GameScreen({ onBack }: { onBack: () => void }) {
           {activeTile ? (
             <div className="drag-stack">
               <TileFace tile={activeTile} floating />
-              {selectedIds.includes(activeTile.id) && selectedIds.length > 1 && (
-                <span aria-label={`${selectedIds.length} selected tiles`}>{selectedIds.length}</span>
-              )}
+              {(selectedIds.includes(activeTile.id) && selectedIds.length > 1) || activeTailIds.length > 1 ? (
+                <span aria-label={`${Math.max(selectedIds.length, activeTailIds.length)} tiles`}>
+                  {Math.max(selectedIds.length, activeTailIds.length)}
+                </span>
+              ) : null}
             </div>
           ) : null}
         </DragOverlay>

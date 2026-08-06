@@ -1072,6 +1072,7 @@ button:focus-visible,
 }
 
 .board-tile--dragging { opacity: 0.2; }
+.board-tile--tail-lifted { opacity: 0.35; }
 .board-tile--over .tile {
   border-color: var(--cobalt);
   transform: translateY(-3px);
