@@ -40,6 +40,8 @@ import {
   resolveTileDrop,
   resolveTimeout,
   scoreRound,
+  sortRackByGroups,
+  sortRackByRuns,
   validateTurn,
 } from "./game";
 import { BoardCamera, TablePoint, TablePositions, groupFootprint, layoutLockedBoard } from "./layout";
@@ -1070,6 +1072,10 @@ function GameScreen({ onBack }: { onBack: () => void }) {
           className={`rack-section ${rack.length > 14 ? "rack-section--compact" : ""} ${rack.length > 20 ? "rack-section--crowded" : ""}`}
           label={`Your tile rack. All ${rack.length} tiles visible`}
         >
+          <div className="rack-tools" aria-label="Sort your rack">
+            <button type="button" onClick={() => setRack(sortRackByGroups(rack))} aria-label="Sort into groups of one number">777</button>
+            <button type="button" onClick={() => setRack(sortRackByRuns(rack))} aria-label="Sort into colour runs">789</button>
+          </div>
           <div className="rack-shell">
             <div
               className="rack-grid"
