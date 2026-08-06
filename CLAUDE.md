@@ -73,7 +73,7 @@ Group screen positions live in `groupPositions: TablePositions` (percent coordin
 
 ### Turn loop
 
-Driven by `useEffect`s in `GameScreen`: a 1s timer; a timeout handler using `resolveTimeout(moveCount, tableIsLegal, poolIsEmpty)` (`game.ts:459`), whose outcome is one of `submit` / `draw-one` / `revert-draw-one` / `pass` — there is no more 3-tile penalty draw, timing out on an unfinished illegal draft now restores the table and draws exactly one tile; and an opponent effect that runs `playOpponentTurn` after 1050ms and chains **Leo → Maya → you**. `turnNumber` only increments after Maya finishes.
+Driven by `useEffect`s in `GameScreen`: a 1s timer; a timeout handler using `resolveTimeout(moveCount, tableIsLegal, poolIsEmpty)` (`game.ts:459`), whose outcome is one of `submit` / `draw-one` / `revert-draw-one` / `pass` — there is no more 3-tile penalty draw, timing out on an unfinished illegal draft now restores the table and draws exactly one tile; and an opponent effect that runs `playOpponentTurn` after a random 3–10s "thinking" delay (computed per opponent turn, `Math.random` in the effect) and chains **Leo → Maya → you**. `turnNumber` only increments after Maya finishes.
 
 Pool-empty endgame: once the pool is empty, "End turn" becomes "Pass" (`handlePass`, `App.tsx:537`) for you, and a stuck AI turn counts as a pass for the opponent. Three consecutive passes across the table end the round by stalemate — `scoreStalemate` (`game.ts:482`) awards the lowest rack total the difference from every other rack (zero-sum), rather than the normal `scoreRound` winner-takes-all-remaining-points scoring. The result sheet shows a distinct "Pool empty · no moves left" variant in this case.
 
