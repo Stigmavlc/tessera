@@ -424,7 +424,7 @@ export function validateTurn(start: TurnSnapshot, board: BoardGroup[], rack: Til
 
   return {
     legal: true,
-    reason: rack.length === 0 ? "Rummikub — your rack is empty!" : "Every tile is in a legal meld.",
+    reason: rack.length === 0 ? "Tessera — your rack is empty!" : "Every tile is in a legal meld.",
     playedTileIds,
     openingScore,
     opensPlayer: !start.hasOpened,
