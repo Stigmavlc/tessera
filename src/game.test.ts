@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   BoardGroup,
+  Deal,
   TurnSnapshot,
   addTileToGroup,
   analyzeMeld,
+  createDeal,
   createStandardPool,
   initialBoard,
   initialOpponentRacks,
@@ -16,6 +18,7 @@ import {
   rackScore,
   resolveTimeout,
   scoreRound,
+  seededRng,
   tile,
   validateTurn,
 } from "./game";
@@ -320,5 +323,25 @@ describe("turn rules", () => {
     const notOpened: TurnSnapshot = { ...openedStart, hasOpened: false };
     expect(validateTurn(notOpened, manipulated, initialRack.filter((entry) => entry.id !== seven.id)))
       .toMatchObject({ legal: false, reason: "Your opening meld cannot use or rearrange tiles already on the table." });
+  });
+});
+
+describe("createDeal", () => {
+  it("deals 14 tiles to each of three players and 64 to the pool, conserving all 106", () => {
+    const deal = createDeal(seededRng(1));
+    expect(deal.rack).toHaveLength(14);
+    expect(deal.opponents.Maya).toHaveLength(14);
+    expect(deal.opponents.Leo).toHaveLength(14);
+    expect(deal.pool).toHaveLength(64);
+    const ids = [...deal.rack, ...deal.opponents.Maya, ...deal.opponents.Leo, ...deal.pool]
+      .map((entry) => entry.id);
+    expect(new Set(ids).size).toBe(106);
+  });
+
+  it("is deterministic per seed and different across seeds", () => {
+    expect(createDeal(seededRng(7)).rack.map((entry) => entry.id))
+      .toEqual(createDeal(seededRng(7)).rack.map((entry) => entry.id));
+    expect(createDeal(seededRng(8)).rack.map((entry) => entry.id))
+      .not.toEqual(createDeal(seededRng(7)).rack.map((entry) => entry.id));
   });
 });
