@@ -29,6 +29,7 @@ import {
   Deal,
   OpponentName,
   OpponentRacks,
+  PlayerName,
   Tile,
   TurnSnapshot,
   analyzeMeld,
@@ -40,6 +41,7 @@ import {
   resolveTileDrop,
   resolveTimeout,
   scoreRound,
+  scoreStalemate,
   sortRackByGroups,
   sortRackByRuns,
   validateTurn,
@@ -482,6 +484,8 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   const [activeOpponent, setActiveOpponent] = useState<OpponentName>("Leo");
   const [turnNumber, setTurnNumber] = useState(1);
   const [winner, setWinner] = useState<Winner | null>(null);
+  const [consecutivePasses, setConsecutivePasses] = useState(0);
+  const [endedByStalemate, setEndedByStalemate] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sound, setSound] = useState(true);
@@ -516,14 +520,38 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       Maya: opponentRacks.Maya,
       Leo: opponentRacks.Leo,
     };
-    const scores = scoreRound(winner, racks);
+    const scores = endedByStalemate ? scoreStalemate(racks).scores : scoreRound(winner, racks);
     const players: Winner[] = ["You", "Maya", "Leo"];
     return players.map((player) => ({
       player,
       tiles: racks[player].length,
       score: scores[player],
     }));
-  }, [winner, rack, opponentRacks]);
+  }, [winner, rack, opponentRacks, endedByStalemate]);
+
+  const endByStalemate = (racks: Record<PlayerName, Tile[]>) => {
+    setEndedByStalemate(true);
+    setWinner(scoreStalemate(racks).winner);
+  };
+
+  const handlePass = () => {
+    const base = cloneTurnSnapshot(turnStart);
+    setRack(base.rack);
+    setBoard(cloneBoard(base.board));
+    setGroupPositions(clonePositions(turnStartPositions));
+    setHistory([]);
+    setMoveCount(0);
+    setSelectedIds([]);
+    const nextPasses = consecutivePasses + 1;
+    if (nextPasses >= 3) {
+      endByStalemate({ You: base.rack, Maya: opponentRacks.Maya, Leo: opponentRacks.Leo });
+      return;
+    }
+    setConsecutivePasses(nextPasses);
+    setToast("Pool empty · you pass");
+    setActiveOpponent("Leo");
+    window.setTimeout(() => setTurnState("opponent"), 420);
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -545,7 +573,11 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (timer !== 0 || turnState !== "you" || settingsOpen || winner) return;
 
-    const timeoutOutcome = resolveTimeout(moveCount, turnValidation.legal);
+    const timeoutOutcome = resolveTimeout(moveCount, turnValidation.legal, turnStart.pool.length === 0);
+    if (timeoutOutcome === "pass") {
+      handlePass();
+      return;
+    }
     if (timeoutOutcome === "submit") {
       const opened = hasOpened || turnValidation.opensPlayer;
       const committedBoard = sealDraftSlot(board, `you-${turnNumber}`);
@@ -583,7 +615,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     setToast(timeoutOutcome === "revert-draw-one" ? "Time’s up · table restored · drew 1" : "Time’s up · drew one tile");
     setActiveOpponent("Leo");
     setTurnState("opponent");
-  }, [timer, turnState, settingsOpen, winner, moveCount, turnValidation, hasOpened, board, turnNumber, turnStart, turnStartPositions]);
+  }, [timer, turnState, settingsOpen, winner, moveCount, turnValidation, hasOpened, board, turnNumber, turnStart, turnStartPositions, consecutivePasses, opponentRacks]);
 
   useEffect(() => {
     if (turnState !== "opponent" || winner) return;
@@ -603,6 +635,20 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       setGroupPositions(nextPositions);
       setPool([...result.pool]);
       setOpponentRacks((current) => ({ ...current, [actingOpponent]: [...result.rack] }));
+      if (result.action === "stuck") {
+        const nextPasses = consecutivePasses + 1;
+        if (nextPasses >= 3) {
+          endByStalemate({
+            You: rack,
+            Maya: actingOpponent === "Maya" ? result.rack : opponentRacks.Maya,
+            Leo: actingOpponent === "Leo" ? result.rack : opponentRacks.Leo,
+          });
+          return;
+        }
+        setConsecutivePasses(nextPasses);
+      } else {
+        setConsecutivePasses(0);
+      }
       if (result.opensPlayer) {
         setOpponentOpened((current) => ({ ...current, [actingOpponent]: true }));
       }
@@ -632,7 +678,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       setSelectedIds([]);
     }, 1050);
     return () => window.clearTimeout(timeout);
-  }, [turnState, winner, activeOpponent, opponentRacks, opponentOpened, board, pool, turnNumber, rack, hasOpened, groupPositions]);
+  }, [turnState, winner, activeOpponent, opponentRacks, opponentOpened, board, pool, turnNumber, rack, hasOpened, groupPositions, consecutivePasses]);
 
   useEffect(() => {
     if (!toast) return;
@@ -906,10 +952,6 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     if (turnState !== "you" || winner) return;
     const base = cloneTurnSnapshot(turnStart);
     const nextTile = base.pool[0];
-    if (!nextTile) {
-      setToast("The pool is empty — play must continue from the rack");
-      return;
-    }
     const committed: TurnSnapshot = {
       ...base,
       rack: [...base.rack, nextTile],
@@ -923,6 +965,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     setHistory([]);
     setMoveCount(0);
     setSelectedIds([]);
+    setConsecutivePasses(0);
     setActiveOpponent("Leo");
     window.setTimeout(() => setTurnState("opponent"), 420);
   };
@@ -946,6 +989,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     setGroupPositions((current) => positionTableGroups(committed.board, current));
     setHistory([]);
     setMoveCount(0);
+    setConsecutivePasses(0);
     window.setTimeout(() => setCelebrating(false), 900);
     if (turnValidation.winsGame) {
       setWinner("You");
@@ -958,7 +1002,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   const handleTurnAction = () => {
     if (turnState !== "you" || winner) return;
     if (moveCount === 0) {
-      handleDraw();
+      pool.length === 0 ? handlePass() : handleDraw();
       return;
     }
     handleEndTurn();
@@ -994,6 +1038,8 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     setActiveOpponent("Leo");
     setTurnNumber(1);
     setWinner(null);
+    setConsecutivePasses(0);
+    setEndedByStalemate(false);
     setSelectedIds([]);
     setSettingsOpen(false);
     setToast(null);
@@ -1139,10 +1185,10 @@ function GameScreen({ onBack }: { onBack: () => void }) {
           disabled={turnState !== "you"}
           whileTap={{ scale: 0.96 }}
           aria-label={moveCount === 0
-            ? `Draw one tile and end turn. ${pool.length} tiles remain in the pool.`
+            ? (pool.length === 0 ? "Pass — the pool is empty." : `Draw one tile and end turn. ${pool.length} tiles remain in the pool.`)
             : turnValidation.legal ? "End turn" : "Fix the table before ending the turn"}
         >
-          <span className="turn-action__label">End turn</span>
+          <span className="turn-action__label">{moveCount === 0 && pool.length === 0 ? "Pass" : "End turn"}</span>
           <span className="turn-action__arrow" aria-hidden="true">→</span>
         </motion.button>
       </section>
@@ -1162,9 +1208,11 @@ function GameScreen({ onBack }: { onBack: () => void }) {
               transition={{ type: "spring", stiffness: 330, damping: 31 }}
             >
               <div className="result-burst" aria-hidden="true"><span>✦</span><span>◆</span><span>✤</span></div>
-              <span className="result-sheet__eyebrow">Round complete</span>
-              <h2>{winner === "You" ? "Beautifully played." : `${winner} takes the table.`}</h2>
-              <p>{winner === "You" ? "You cleared all of your tiles." : `${winner} cleared their rack first.`}</p>
+              <span className="result-sheet__eyebrow">{endedByStalemate ? "Pool empty · no moves left" : "Round complete"}</span>
+              <h2>{winner === "You" ? (endedByStalemate ? "Narrow victory." : "Beautifully played.") : `${winner} takes the table.`}</h2>
+              <p>{endedByStalemate
+                ? "Nobody could move — lowest rack total wins."
+                : winner === "You" ? "You cleared all of your tiles." : `${winner} cleared their rack first.`}</p>
               <div className="scoreboard" aria-label="Final scores">
                 {finalScores.map((entry) => {
                   const tone = entry.player === "You" ? "olive" : entry.player === "Leo" ? "blue" : "terra";
