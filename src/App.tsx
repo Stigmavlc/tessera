@@ -3,6 +3,7 @@ import {
   DndContext,
   type CollisionDetection,
   DragEndEvent,
+  DragOverEvent,
   DragOverlay,
   DragStartEvent,
   KeyboardSensor,
@@ -331,6 +332,7 @@ function DroppableGroup({
   group,
   activeTile,
   activeTailIds,
+  hot,
   selectedTiles,
   onTap,
   returnableTileIds,
@@ -339,6 +341,7 @@ function DroppableGroup({
   group: BoardGroup;
   activeTile: Tile | null;
   activeTailIds: string[];
+  hot: boolean;
   selectedTiles: Tile[];
   onTap: (groupId: string) => void;
   returnableTileIds: Set<string>;
@@ -364,7 +367,7 @@ function DroppableGroup({
   return (
     <div
       ref={setNodeRef}
-      className={`meld meld--${group.id} meld--kind-${group.kind} meld--table-added ${isFourTileSet ? "meld--four-set" : ""} ${lengthClass} ${isOver ? "meld--over" : ""} ${canReceive ? "meld--receivable" : ""} ${isDraftInvalid ? "meld--invalid" : ""}`}
+      className={`meld meld--${group.id} meld--kind-${group.kind} meld--table-added ${isFourTileSet ? "meld--four-set" : ""} ${lengthClass} ${isOver ? "meld--over" : ""} ${hot ? "meld--hot" : ""} ${canReceive ? "meld--receivable" : ""} ${isDraftInvalid ? "meld--invalid" : ""}`}
       onClick={(event) => {
         event.stopPropagation();
         onTap(group.id);
@@ -500,6 +503,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   }));
   const [activeTile, setActiveTile] = useState<Tile | null>(null);
   const [activeTailIds, setActiveTailIds] = useState<string[]>([]);
+  const [hoverGroupId, setHoverGroupId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [history, setHistory] = useState<ActionSnapshot[]>([]);
   const [moveCount, setMoveCount] = useState(0);
@@ -903,6 +907,27 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     };
   };
 
+  const handleDragOver = ({ over }: DragOverEvent) => {
+    const overId = over ? String(over.id) : "";
+    if (overId.startsWith("group:")) {
+      setHoverGroupId(overId.slice(6));
+      return;
+    }
+    if (overId.startsWith("board-target:")) {
+      const targetTileId = overId.slice("board-target:".length);
+      const owner = board.find((group) => group.tiles.some((entry) => entry.id === targetTileId));
+      setHoverGroupId(owner?.id ?? null);
+      return;
+    }
+    setHoverGroupId(null);
+  };
+
+  const handleDragCancel = () => {
+    setActiveTile(null);
+    setActiveTailIds([]);
+    setHoverGroupId(null);
+  };
+
   const handleDragStart = ({ active }: DragStartEvent) => {
     const dragged = active.data.current?.tile as Tile | undefined;
     setActiveTile(dragged ?? null);
@@ -912,6 +937,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     setActiveTile(null);
     setActiveTailIds([]);
+    setHoverGroupId(null);
     if (!over || turnState !== "you") return;
     const activeId = String(active.id);
     const overId = String(over.id);
@@ -1112,7 +1138,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
         <div className={`rail-player ${turnState === "you" ? "rail-player--active" : ""}`}><Avatar initials="Y" tone="olive" active={turnState === "you"} /><span><strong>You</strong><em>{rack.length} tiles</em></span></div>
       </section>
 
-      <DndContext sensors={sensors} collisionDetection={tabletopCollision} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={tabletopCollision} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
         <BoardDropZone
           empty={boardIsEmpty}
           onTableTap={handleTableTap}
@@ -1135,6 +1161,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
                   group={group}
                   activeTile={activeTile}
                   activeTailIds={activeTailIds}
+                  hot={hoverGroupId === group.id}
                   selectedTiles={selectedTiles}
                   onTap={handleGroupTap}
                   returnableTileIds={turnState === "you" ? returnableTileIds : new Set<string>()}
@@ -1656,7 +1683,7 @@ function HomeIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d
 function PlayIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 9 5-9 5z" /></svg>; }
 function ProfileIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M5 21c.6-5 3-7 7-7s6.4 2 7 7z" /></svg>; }
 function BackIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7" /></svg>; }
-function SettingsIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2.2 2.2M16.8 16.8 19 19M19 5l-2.2 2.2M7.2 16.8 5 19" /></svg>; }
+function SettingsIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.2 13.4a7.4 7.4 0 0 0 0-2.8l2-1.6-1.9-3.3-2.4.9a7.4 7.4 0 0 0-2.4-1.4L14.1 2h-4.2l-.4 2.5a7.4 7.4 0 0 0-2.4 1.4l-2.4-.9L2.8 8.3l2 1.6a7.4 7.4 0 0 0 0 2.8l-2 1.6 1.9 3.3 2.4-.9a7.4 7.4 0 0 0 2.4 1.4l.4 2.5h4.2l.4-2.5a7.4 7.4 0 0 0 2.4-1.4l2.4.9 1.9-3.3z" /></svg>; }
 function UndoIcon() { return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7-5 5 5 5M5 12h8a6 6 0 1 1 0 12" /></svg>; }
 
 export default App;
