@@ -482,6 +482,24 @@ export function rackScore(rack: Tile[]): number {
   return rack.reduce((total, entry) => total + tilePoints(entry), 0);
 }
 
+const jokerRank = (entry: Tile) => Number(entry.color === "joker");
+const valueRank = (entry: Tile) => typeof entry.value === "number" ? entry.value : 0;
+const colorRank = (entry: Tile) => entry.color === "joker"
+  ? standardColors.length
+  : standardColors.indexOf(entry.color);
+
+export function sortRackByGroups(rack: Tile[]): Tile[] {
+  return [...rack].sort((first, second) => jokerRank(first) - jokerRank(second)
+    || valueRank(first) - valueRank(second)
+    || colorRank(first) - colorRank(second));
+}
+
+export function sortRackByRuns(rack: Tile[]): Tile[] {
+  return [...rack].sort((first, second) => jokerRank(first) - jokerRank(second)
+    || colorRank(first) - colorRank(second)
+    || valueRank(first) - valueRank(second));
+}
+
 export function resolveTimeout(moveCount: number, tableIsLegal: boolean): TimeoutOutcome {
   if (moveCount === 0) return "draw-one";
   return tableIsLegal ? "submit" : "penalty-three";
