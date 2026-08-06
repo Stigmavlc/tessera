@@ -51,7 +51,7 @@ export type AITurnResult = {
   winsGame: boolean;
 };
 
-export type TimeoutOutcome = "submit" | "draw-one" | "revert-draw-one";
+export type TimeoutOutcome = "submit" | "draw-one" | "revert-draw-one" | "pass";
 
 export const standardColors: Exclude<TileColor, "joker">[] = [
   "terracotta",
@@ -456,8 +456,8 @@ export function sortRackByRuns(rack: Tile[]): Tile[] {
     || valueRank(first) - valueRank(second));
 }
 
-export function resolveTimeout(moveCount: number, tableIsLegal: boolean): TimeoutOutcome {
-  if (moveCount === 0) return "draw-one";
+export function resolveTimeout(moveCount: number, tableIsLegal: boolean, poolIsEmpty: boolean): TimeoutOutcome {
+  if (moveCount === 0) return poolIsEmpty ? "pass" : "draw-one";
   return tableIsLegal ? "submit" : "revert-draw-one";
 }
 

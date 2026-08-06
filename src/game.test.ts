@@ -296,9 +296,10 @@ describe("turn rules", () => {
   });
 
   it("resolves timeout from the current table state", () => {
-    expect(resolveTimeout(0, false)).toBe("draw-one");
-    expect(resolveTimeout(3, true)).toBe("submit");
-    expect(resolveTimeout(2, false)).toBe("revert-draw-one");
+    expect(resolveTimeout(0, false, false)).toBe("draw-one");
+    expect(resolveTimeout(0, false, true)).toBe("pass");
+    expect(resolveTimeout(3, true, false)).toBe("submit");
+    expect(resolveTimeout(2, false, false)).toBe("revert-draw-one");
   });
 
   it("requires a 30-point opening made only from rack tiles", () => {
