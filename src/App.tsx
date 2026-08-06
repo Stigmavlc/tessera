@@ -586,6 +586,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       setHistory([]);
       setMoveCount(0);
       setSelectedIds([]);
+      setConsecutivePasses(0);
       if (turnValidation.winsGame) {
         setToast("Time’s up · legal winning table submitted");
         setWinner("You");
