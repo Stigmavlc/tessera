@@ -1,0 +1,14 @@
+{
+  "name": "Tessera",
+  "short_name": "Tessera",
+  "description": "A tactile tile-rummy game made for touch.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4ead7",
+  "theme_color": "#f4ead7",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
