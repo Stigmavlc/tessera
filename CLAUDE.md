@@ -20,6 +20,10 @@ Single test / filter: `npm test -- -t "uses jokers to bridge"` or `npx vitest ru
 
 There is no linter or formatter configured. Verification = `npm test && npm run build`.
 
+## Deployment
+
+GitHub Pages (repo `Stigmavlc/tessera`), auto-deployed by `.github/workflows/deploy.yml` on every push to `main` (runs tests + build first). Vite uses `base: "./"` so the same build works locally and under the Pages subpath. Live URL: https://stigmavlc.github.io/tessera/ — personalised seat labels via `?name=` (display-only, `localPlayerName` in App.tsx; engine keys stay "You").
+
 ## Architecture
 
 Four files carry the whole app:

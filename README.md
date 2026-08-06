@@ -1,6 +1,12 @@
 # Tessera
 
-A mobile-first, frontend-only tile-rummy prototype focused on visual direction, touch play, and motion. No database or network layer is included yet.
+A mobile-first, frontend-only tile-rummy game focused on visual direction, touch play, and motion. Single-player against two local AI opponents; no database or network layer.
+
+## Play online
+
+The game deploys to GitHub Pages automatically on every push to `main` (see `.github/workflows/deploy.yml`): https://stigmavlc.github.io/tessera/
+
+Personalised links: add `?name=` to relabel the local seat — e.g. `?name=Mara` or `?name=Lluci`. The name appears in the lobby, the player rail, and the final scoreboard; without the parameter the seat says "You". Display-only — every visitor plays their own solo game on their device.
 
 ## Run locally
 
@@ -9,7 +15,7 @@ npm install
 npm run dev
 ```
 
-Then open the local URL printed by Vite.
+Then open the local URL printed by Vite (the dev server binds all interfaces, so a phone on the same Wi-Fi can use the network URL).
 
 ## Included interactions
 
