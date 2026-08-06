@@ -82,6 +82,35 @@ export function createStandardPool(): Tile[] {
   return tiles;
 }
 
+export const seededRng = (seed: number): (() => number) => {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+};
+
+const shuffleTiles = (tiles: Tile[], rng: () => number): Tile[] => {
+  const result = [...tiles];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(rng() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+  return result;
+};
+
+export type Deal = { rack: Tile[]; opponents: OpponentRacks; pool: Tile[] };
+
+// A fresh three-player deal: 14 tiles each and 64 in the pool.
+export function createDeal(rng: () => number = Math.random): Deal {
+  const tiles = shuffleTiles(createStandardPool(), rng);
+  return {
+    rack: tiles.slice(0, 14),
+    opponents: { Maya: tiles.slice(14, 28), Leo: tiles.slice(28, 42) },
+    pool: tiles.slice(42),
+  };
+}
+
 export const initialRack: Tile[] = [
   standardTile("terracotta", 1, "a"),
   standardTile("graphite", 2, "a"),
