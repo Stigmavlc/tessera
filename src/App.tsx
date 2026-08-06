@@ -460,7 +460,9 @@ function HomeScreen({ onPlay }: { onPlay: () => void }) {
         <p>Shape runs. Break patterns. Own the table.</p>
         <motion.button className="primary-button" type="button" onClick={onPlay} whileHover={{ y: -2 }} whileTap={{ scale: 0.975 }}>
           <span>Play now</span>
-          <span className="button-arrow" aria-hidden="true">↗</span>
+          <span className="button-arrow" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" /></svg>
+          </span>
         </motion.button>
       </section>
 
@@ -1290,7 +1292,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
                   );
                 })}
               </div>
-              <button className="result-button" type="button" onClick={resetGame}>Play again <span aria-hidden="true">↗</span></button>
+              <button className="result-button" type="button" onClick={resetGame}>Play again <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6" /></svg></span></button>
               <button className="result-home" type="button" onClick={onBack}>Back to home</button>
             </motion.section>
           </>
