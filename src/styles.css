@@ -868,7 +868,7 @@ button:focus-visible,
   will-change: transform;
 }
 
-.board-fit-button {
+.board-fit-button, .board-lock-button {
   position: absolute;
   right: 16px;
   bottom: 16px;
@@ -890,9 +890,11 @@ button:focus-visible,
   text-transform: uppercase;
 }
 
-.board-fit-button:active { transform: scale(0.97); }
+.board-lock-button { right: 76px; }
 
-.board-fit-button svg {
+.board-fit-button:active, .board-lock-button:active { transform: scale(0.97); }
+
+.board-fit-button svg, .board-lock-button svg {
   width: 13px;
   height: 13px;
   fill: none;
