@@ -370,11 +370,25 @@ describe("resolveTileDrop", () => {
     expect(isValidBoard(result.groups)).toBe(true);
   });
 
-  it("refuses a split that would leave a short half and falls back to draft", () => {
+  it("splits even when a half stays an incomplete draft (finish it before End Turn)", () => {
+    const groups = [run("r", [8, 9, 10, 11]), group("new-meld", [])];
+    const result = resolveTileDrop(groups, "r", [tile("r10b", 10, "terracotta")], undefined, "split-x");
+    expect(result.kind).toBe("split");
+    expect(result.groups.find((entry) => entry.id === "r")?.tiles.map((entry) => entry.value))
+      .toEqual([8, 9, 10]);
+    expect(result.groups.find((entry) => entry.id === "split-x")?.tiles.map((entry) => entry.value))
+      .toEqual([10, 11]);
+    expect(analyzeMeld(result.groups.find((entry) => entry.id === "split-x")!.tiles).valid).toBe(false);
+  });
+
+  it("splits short runs into two incomplete drafts rather than clumping", () => {
     const groups = [run("r", [4, 5, 6]), group("new-meld", [])];
     const result = resolveTileDrop(groups, "r", [tile("r5b", 5, "terracotta")], undefined, "split-x");
-    expect(result.kind).toBe("draft");
-    expect(result.groups.find((entry) => entry.id === "r")?.tiles).toHaveLength(4);
+    expect(result.kind).toBe("split");
+    expect(result.groups.find((entry) => entry.id === "r")?.tiles.map((entry) => entry.value))
+      .toEqual([4, 5]);
+    expect(result.groups.find((entry) => entry.id === "split-x")?.tiles.map((entry) => entry.value))
+      .toEqual([5, 6]);
   });
 
   it("splits around a joker, which keeps its represented value in the left half", () => {

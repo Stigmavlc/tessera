@@ -24,7 +24,7 @@ Then open the local URL printed by Vite.
 - Permissive table drafting while arranging, with strict legality enforced when the turn is committed
 - Return any rack tile played this turn using its table remove control or by dragging it back
 - Numeric draft ordering and tile-level drop targets for table repositioning
-- Reorderable two-row rack that keeps every held tile visible without scrolling, with one-tap 777 / 789 sorting
+- Reorderable two-row rack that keeps every held tile visible without scrolling — your arrangement is never re-sorted for you
 - Fresh random deal every game — 14 tiles per player, 64 in the pool
 - Strict run, group, joker, 30-point opening-meld, and table-conservation rules
 - One consistently labelled End Turn action: draw one and pass when idle, or submit a legal play

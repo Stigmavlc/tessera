@@ -576,9 +576,12 @@ button:focus-visible,
   opacity: 0.58;
 }
 
-.tile--terracotta { color: var(--terra-deep); }
+/* Tile ink colours are deliberately farther apart than the app palette:
+   terracotta reads as unmistakable red, marigold as golden yellow —
+   players confused the two when both leaned orange. */
+.tile--terracotta { color: #c11f14; }
 .tile--cobalt { color: #0868cf; }
-.tile--marigold { color: #aa6a00; }
+.tile--marigold { color: #a3810a; }
 .tile--graphite { color: #201d1a; }
 .tile--joker .tile__number { font-size: 25px; }
 .tile--terracotta .tile__pip { border-radius: 50%; }
@@ -1015,28 +1018,6 @@ button:focus-visible,
   filter: blur(2px);
 }
 
-.rack-tools {
-  position: absolute;
-  top: -14px;
-  right: 14px;
-  z-index: 3;
-  display: flex;
-  gap: 6px;
-}
-
-.rack-tools button {
-  padding: 3px 9px;
-  border: 1.5px solid var(--line);
-  border-radius: 999px;
-  background: var(--cream-bright);
-  font-family: var(--serif);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-}
-
-.rack-tools button:active { transform: scale(0.95); }
 
 .rack-grid {
   --rack-columns: 7;
