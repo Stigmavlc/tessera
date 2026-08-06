@@ -73,6 +73,11 @@ const clonePositions = (positions: TablePositions): TablePositions => Object.fro
   Object.entries(positions).map(([id, point]) => [id, { ...point }]),
 );
 
+// Personalised share links: ?name=Mara relabels the local seat everywhere the
+// UI shows it. Engine state keeps the internal "You" key — display only.
+const localPlayerName = (new URLSearchParams(window.location.search).get("name")?.trim() || "You").slice(0, 12);
+const localPlayerInitial = localPlayerName.charAt(0).toUpperCase();
+
 const defaultCamera: BoardCamera = { x: 0, y: 6, zoom: 0.58 };
 const tableSlots: TablePoint[] = [
   { x: 18, y: 12 }, { x: 50, y: 12 }, { x: 82, y: 12 },
@@ -476,7 +481,7 @@ function HomeScreen({ onPlay }: { onPlay: () => void }) {
           <span className="player-divider" aria-hidden="true">◆</span>
           <div className="home-player"><Avatar initials="L" tone="blue" /><span>Leo</span></div>
           <span className="player-divider" aria-hidden="true">◆</span>
-          <div className="home-player home-player--you"><Avatar initials="Y" tone="olive" active /><span>You</span></div>
+          <div className="home-player home-player--you"><Avatar initials={localPlayerInitial} tone="olive" active /><span>{localPlayerName}</span></div>
         </div>
       </section>
 
@@ -1140,7 +1145,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       <section className="player-rail" aria-label="Players">
         <div className={`rail-player ${turnState === "opponent" && activeOpponent === "Maya" ? "rail-player--active" : ""}`}><Avatar initials="M" tone="terra" active={turnState === "opponent" && activeOpponent === "Maya"} /><span><strong>Maya</strong><em>{opponentRacks.Maya.length} tiles</em></span></div>
         <div className={`rail-player ${turnState === "opponent" && activeOpponent === "Leo" ? "rail-player--active" : ""}`}><Avatar initials="L" tone="blue" active={turnState === "opponent" && activeOpponent === "Leo"} /><span><strong>Leo</strong><em>{opponentRacks.Leo.length} tiles</em></span></div>
-        <div className={`rail-player ${turnState === "you" ? "rail-player--active" : ""}`}><Avatar initials="Y" tone="olive" active={turnState === "you"} /><span><strong>You</strong><em>{rack.length} tiles</em></span></div>
+        <div className={`rail-player ${turnState === "you" ? "rail-player--active" : ""}`}><Avatar initials={localPlayerInitial} tone="olive" active={turnState === "you"} /><span><strong>{localPlayerName}</strong><em>{rack.length} tiles</em></span></div>
       </section>
 
       <DndContext sensors={sensors} collisionDetection={tabletopCollision} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
@@ -1285,11 +1290,11 @@ function GameScreen({ onBack }: { onBack: () => void }) {
               <div className="scoreboard" aria-label="Final scores">
                 {finalScores.map((entry) => {
                   const tone = entry.player === "You" ? "olive" : entry.player === "Leo" ? "blue" : "terra";
-                  const initials = entry.player === "You" ? "Y" : entry.player[0];
+                  const initials = entry.player === "You" ? localPlayerInitial : entry.player[0];
                   return (
                     <div className={`score-row ${entry.player === winner ? "score-row--winner" : ""}`} key={entry.player}>
                       <Avatar initials={initials} tone={tone} active={entry.player === winner} />
-                      <span><strong>{entry.player}</strong><em>{entry.tiles} tile{entry.tiles === 1 ? "" : "s"} left</em></span>
+                      <span><strong>{entry.player === "You" ? localPlayerName : entry.player}</strong><em>{entry.tiles} tile{entry.tiles === 1 ? "" : "s"} left</em></span>
                       <b>{entry.score > 0 ? "+" : ""}{entry.score}</b>
                     </div>
                   );
