@@ -363,7 +363,13 @@ export function resolveTileDrop(
     const split = splitRunWithTile(target, movingTiles[0]);
     if (split) {
       const nextGroups = groups.flatMap((group): BoardGroup[] => group.id === groupId
-        ? [{ ...group, tiles: split.left }, { id: newGroupId, kind: "run", tiles: split.right }]
+        ? [{ ...group, tiles: split.left }, {
+          id: newGroupId,
+          // Splitting an unsealed draft yields drafts; splitting a sealed run
+          // yields runs. Keeps pre-opening drafts finishable (kind "new").
+          kind: group.kind === "new" ? "new" : "run",
+          tiles: split.right,
+        }]
         : [group]);
       return { kind: "split", groups: nextGroups };
     }
