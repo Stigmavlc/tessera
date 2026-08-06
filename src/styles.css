@@ -359,12 +359,22 @@ button:focus-visible,
 
 .button-arrow {
   display: grid;
-  width: 33px;
-  aspect-ratio: 1;
   place-items: center;
-  border: 1px solid rgba(255, 249, 237, 0.4);
-  border-radius: 50%;
-  font-size: 17px;
+}
+
+.button-arrow svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 160ms ease;
+}
+
+.primary-button:hover .button-arrow svg {
+  transform: translateX(3px);
 }
 
 .active-game {
@@ -1375,7 +1385,8 @@ button:focus-visible,
   font-weight: 780;
 }
 
-.result-button span { font-size: 20px; }
+.result-button span { display: inline-grid; place-items: center; }
+.result-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 
 .result-home {
   margin-top: 13px;
