@@ -1306,7 +1306,20 @@ function GameScreen({ onBack }: { onBack: () => void }) {
         {settingsOpen && (
           <>
             <motion.button className="sheet-scrim" type="button" aria-label="Close settings" onClick={() => setSettingsOpen(false)} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} />
-            <motion.section className="settings-sheet" initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", stiffness: 360, damping: 34 }}>
+            <motion.section
+              className="settings-sheet"
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", stiffness: 360, damping: 34 }}
+              drag="y"
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.65 }}
+              onDragEnd={(_, info) => {
+                // Swipe or drag the sheet down to dismiss — the handle invites it.
+                if (info.offset.y > 90 || info.velocity.y > 550) setSettingsOpen(false);
+              }}
+            >
               <div className="sheet-handle" />
               <div className="settings-sheet__heading"><BrandMark compact /><div><span>Table settings</span><strong>Keep the game feeling good.</strong></div></div>
               <SettingRow label="Table sounds" description="Soft ceramic clicks and turn cues" value={sound} onChange={setSound} />
