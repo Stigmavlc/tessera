@@ -432,8 +432,12 @@ button:focus-visible,
 }
 
 .player-divider {
+  /* Line box matches the avatar height and the divider is pinned to the row
+     top, so the dot centres on the circles, not on circle + name. */
+  align-self: start;
   color: var(--terra);
   font-size: 8px;
+  line-height: 50px;
 }
 
 .avatar {
@@ -1505,6 +1509,7 @@ button:focus-visible,
   .active-game { padding-top: 10px; padding-bottom: 9px; }
   .active-game__topline { margin-bottom: 7px; }
   .home-player .avatar { width: 44px; }
+  .player-divider { line-height: 44px; }
   .game-screen { grid-template-rows: 92px 62px minmax(228px, 1fr) 166px 86px; }
   .game-header { padding-top: 43px; }
   .tile { width: 42px; height: 57px; }
