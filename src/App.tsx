@@ -42,13 +42,11 @@ import {
   scoreRound,
   validateTurn,
 } from "./game";
+import { BoardCamera, TablePoint, TablePositions, groupFootprint } from "./layout";
 
 type Screen = "home" | "game";
 type TurnState = "you" | "opponent";
 type Winner = "You" | OpponentName;
-type TablePoint = { x: number; y: number };
-type TablePositions = Record<string, TablePoint>;
-type BoardCamera = { x: number; y: number; zoom: number };
 
 type ActionSnapshot = {
   rack: Tile[];
@@ -80,11 +78,6 @@ const tableSlots: TablePoint[] = [
   { x: 18, y: 66 }, { x: 50, y: 66 }, { x: 82, y: 66 },
   { x: 18, y: 84 }, { x: 50, y: 84 }, { x: 82, y: 84 },
 ];
-
-const groupFootprint = (tileCount: number) => ({
-  width: tileCount >= 11 ? tileCount * 4.2 : tileCount >= 8 ? tileCount * 5 : Math.max(18, tileCount * 7.1),
-  height: 15,
-});
 
 const positionsOverlap = (
   first: TablePoint,
