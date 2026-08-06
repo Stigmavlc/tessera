@@ -49,10 +49,10 @@ export function resolveTileDrop(
 ): DropResolution;
 ```
 
-Resolution order for a **single** tile dropped on a meld:
+Resolution order for a **single** tile dropped on a meld (RULING 2026-08-06: split is checked **before** extend — when a dropped tile duplicates an interior value of a joker-run, extending would silently re-aim the joker to a different represented value; Ivan ruled the split gesture wins and jokers never silently change value):
 
-1. **Extend** — if `analyzeMeld([...group.tiles, tile])` is valid, insert via `orderMeldTiles` (current behavior).
-2. **Split** — only when the target group is currently a **legal run** and the dropped tile is a same-color number tile whose value duplicates an **interior represented value** of the run (jokers count as the value they represent, derived from the run's resolved start). Split point: the existing copy stays at the end of the left half; the dropped tile becomes the head of the right half. Fires **only if both halves are legal runs** (≥3 tiles each, re-checked with `analyzeMeld`). The right half becomes a new group with id `newGroupId`, inserted in the board array **immediately after** the parent group (adjacency matters for locked-view layout). Example: blue 7 dropped on the 7 in blue 4–9 → `4-5-6-7` + `7-8-9`. Counter-example: 5 dropped on 4-5-6 → left half would be `4-5` (2 tiles) → no split, falls through.
+1. **Split** — only when the target group is currently a **legal run** and the dropped tile is a same-color number tile whose value duplicates an **interior represented value** of the run (jokers count as the value they represent, derived from the run's resolved start). Split point: the existing copy stays at the end of the left half; the dropped tile becomes the head of the right half. Fires **only if both halves are legal runs** (≥3 tiles each, re-checked with `analyzeMeld`). The right half becomes a new group with id `newGroupId`, inserted in the board array **immediately after** the parent group (adjacency matters for locked-view layout). Example: blue 7 dropped on the 7 in blue 4–9 → `4-5-6-7` + `7-8-9`. Counter-example: 5 dropped on 4-5-6 → left half would be `4-5` (2 tiles) → no split, falls through.
+2. **Extend** — if `analyzeMeld([...group.tiles, tile])` is valid, insert via `orderMeldTiles` (current behavior).
 3. **Draft** — insert at `targetIndex`, meld may become invalid (red highlight), exactly today's permissive behavior. Nothing ever bounces back to the rack.
 
 Batch drops (multi-select): try extend with the whole batch, else draft. Batches never split.

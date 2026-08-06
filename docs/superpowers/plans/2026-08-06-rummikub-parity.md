@@ -115,6 +115,7 @@ git commit -m "feat: add seedable random deal factory"
 **Interfaces:**
 - Consumes: `analyzeMeld`, `orderMeldTiles` (existing), module-private `regularTiles`.
 - Produces: `type DropResolution = { kind: "extend" | "split" | "draft"; groups: BoardGroup[] }`, `resolveTileDrop(groups: BoardGroup[], groupId: string, movingTiles: Tile[], targetIndex: number | undefined, newGroupId: string): DropResolution`. On split, the new group (id `newGroupId`, right half) sits **immediately after** the parent in the returned array.
+- **RULING (2026-08-06, Ivan):** split is checked BEFORE extend, overriding this task's original sample code. Rationale: for joker-runs (e.g. 9-10-★-12-13, ★=11) a dropped duplicate (11) satisfies both tiers — extend-first would silently re-aim the joker (★→8) into one long run, and the plan's own test case 4 requires the split outcome. The shipped code (commit 6a5f614) is authoritative; the Step 3 sample below is retained as-written for the historical record.
 
 - [ ] **Step 1: Write the failing tests**
 
