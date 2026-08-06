@@ -26,15 +26,14 @@ import { CSS } from "@dnd-kit/utilities";
 import { AnimatePresence, motion, useMotionValue } from "framer-motion";
 import {
   BoardGroup,
+  Deal,
   OpponentName,
   OpponentRacks,
   Tile,
   TurnSnapshot,
   analyzeMeld,
+  createDeal,
   initialBoard,
-  initialOpponentRacks,
-  initialPool,
-  initialRack,
   moveBoardTile,
   orderMeldTiles,
   playOpponentTurn,
@@ -442,16 +441,17 @@ function HomeScreen({ onPlay }: { onPlay: () => void }) {
 }
 
 function GameScreen({ onBack }: { onBack: () => void }) {
-  const [rack, setRack] = useState<Tile[]>(initialRack);
+  const [deal, setDeal] = useState<Deal>(() => createDeal());
+  const [rack, setRack] = useState<Tile[]>(deal.rack);
   const [board, setBoard] = useState<BoardGroup[]>(cloneBoard(initialBoard));
-  const [pool, setPool] = useState<Tile[]>(initialPool);
-  const [opponentRacks, setOpponentRacks] = useState<OpponentRacks>(() => cloneOpponentRacks(initialOpponentRacks));
+  const [pool, setPool] = useState<Tile[]>(deal.pool);
+  const [opponentRacks, setOpponentRacks] = useState<OpponentRacks>(() => cloneOpponentRacks(deal.opponents));
   const [opponentOpened, setOpponentOpened] = useState<Record<OpponentName, boolean>>({ Maya: false, Leo: false });
   const [hasOpened, setHasOpened] = useState(false);
   const [turnStart, setTurnStart] = useState<TurnSnapshot>(() => ({
-    rack: [...initialRack],
+    rack: [...deal.rack],
     board: cloneBoard(initialBoard),
-    pool: [...initialPool],
+    pool: [...deal.pool],
     hasOpened: false,
   }));
   const [activeTile, setActiveTile] = useState<Tile | null>(null);
@@ -917,13 +917,15 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   };
 
   const resetGame = () => {
-    setRack(initialRack);
+    const nextDeal = createDeal();
+    setDeal(nextDeal);
+    setRack(nextDeal.rack);
     setBoard(cloneBoard(initialBoard));
-    setPool(initialPool);
-    setOpponentRacks(cloneOpponentRacks(initialOpponentRacks));
+    setPool(nextDeal.pool);
+    setOpponentRacks(cloneOpponentRacks(nextDeal.opponents));
     setOpponentOpened({ Maya: false, Leo: false });
     setHasOpened(false);
-    setTurnStart({ rack: [...initialRack], board: cloneBoard(initialBoard), pool: [...initialPool], hasOpened: false });
+    setTurnStart({ rack: [...nextDeal.rack], board: cloneBoard(initialBoard), pool: [...nextDeal.pool], hasOpened: false });
     setGroupPositions({});
     setTurnStartPositions({});
     setBoardCamera(defaultCamera);

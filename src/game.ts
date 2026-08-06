@@ -111,51 +111,7 @@ export function createDeal(rng: () => number = Math.random): Deal {
   };
 }
 
-export const initialRack: Tile[] = [
-  standardTile("terracotta", 1, "a"),
-  standardTile("graphite", 2, "a"),
-  standardTile("marigold", 4, "b"),
-  standardTile("cobalt", 7, "a"),
-  standardTile("terracotta", 9, "a"),
-  standardTile("marigold", 11, "a"),
-  standardTile("graphite", 12, "a"),
-  tile("joker-a", "★", "joker"),
-  standardTile("cobalt", 1, "a"),
-  standardTile("cobalt", 2, "a"),
-  standardTile("terracotta", 10, "b"),
-  standardTile("graphite", 10, "a"),
-  standardTile("marigold", 10, "a"),
-  standardTile("cobalt", 10, "a"),
-];
-
 export const initialBoard: BoardGroup[] = [{ id: "new-meld", kind: "new", tiles: [] }];
-
-const seededShuffle = <T,>(items: T[]): T[] => {
-  const result = [...items];
-  let seed = 0x5e551a;
-  for (let index = result.length - 1; index > 0; index -= 1) {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    const swapIndex = seed % (index + 1);
-    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
-  }
-  return result;
-};
-
-const occupiedIds = new Set([
-  ...initialRack.map((entry) => entry.id),
-]);
-
-// A deterministic fresh three-player deal: 14 tiles each and 64 in the pool.
-const availableNewGameTiles = seededShuffle(
-  createStandardPool().filter((entry) => !occupiedIds.has(entry.id)),
-);
-
-export const initialPool: Tile[] = availableNewGameTiles.slice(28);
-
-export const initialOpponentRacks: OpponentRacks = {
-  Maya: availableNewGameTiles.slice(0, 14),
-  Leo: availableNewGameTiles.slice(14, 28),
-};
 
 const regularTiles = (tiles: Tile[]) => tiles.filter((entry) => entry.color !== "joker");
 

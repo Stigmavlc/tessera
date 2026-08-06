@@ -4,16 +4,13 @@ import {
   Deal,
   DropResolution,
   StalemateResult,
+  Tile,
   TileColor,
   TurnSnapshot,
   addTileToGroup,
   analyzeMeld,
   createDeal,
-  createStandardPool,
   initialBoard,
-  initialOpponentRacks,
-  initialPool,
-  initialRack,
   isValidBoard,
   moveBoardTile,
   moveBoardTiles,
@@ -31,6 +28,17 @@ import {
   validateTurn,
 } from "./game";
 
+const standard = (color: Exclude<TileColor, "joker">, value: number, copy: "a" | "b") =>
+  tile(`${color}-${value}-${copy}`, value, color);
+
+const fixtureRack: Tile[] = [
+  standard("terracotta", 1, "a"), standard("graphite", 2, "a"), standard("marigold", 4, "b"),
+  standard("cobalt", 7, "a"), standard("terracotta", 9, "a"), standard("marigold", 11, "a"),
+  standard("graphite", 12, "a"), tile("joker-a", "★", "joker"), standard("cobalt", 1, "a"),
+  standard("cobalt", 2, "a"), standard("terracotta", 10, "b"), standard("graphite", 10, "a"),
+  standard("marigold", 10, "a"), standard("cobalt", 10, "a"),
+];
+
 const group = (id: string, tiles: BoardGroup["tiles"]): BoardGroup => ({ id, kind: "new", tiles });
 const tableBoard: BoardGroup[] = [
   group("blue-run", [tile("cobalt-4-a", 4, "cobalt"), tile("cobalt-5-a", 5, "cobalt"), tile("cobalt-6-a", 6, "cobalt")]),
@@ -41,24 +49,6 @@ const tableBoard: BoardGroup[] = [
 ];
 
 describe("classic tile set", () => {
-  it("contains 106 physical tiles and deals 14 to the player", () => {
-    expect(createStandardPool()).toHaveLength(106);
-    expect(initialRack).toHaveLength(14);
-    expect(initialPool).toHaveLength(64);
-    expect(initialOpponentRacks.Maya).toHaveLength(14);
-    expect(initialOpponentRacks.Leo).toHaveLength(14);
-
-    const dealtIds = [
-      ...initialRack,
-      ...initialBoard.flatMap((entry) => entry.tiles),
-      ...initialPool,
-      ...initialOpponentRacks.Maya,
-      ...initialOpponentRacks.Leo,
-    ].map((entry) => entry.id);
-    expect(dealtIds).toHaveLength(106);
-    expect(new Set(dealtIds)).toHaveLength(106);
-  });
-
   it("starts with a legal table", () => {
     expect(isValidBoard(initialBoard)).toBe(true);
     expect(initialBoard.flatMap((entry) => entry.tiles)).toHaveLength(0);
@@ -263,45 +253,45 @@ describe("meld rules", () => {
 
 describe("turn rules", () => {
   const openedStart: TurnSnapshot = {
-    rack: initialRack,
+    rack: fixtureRack,
     board: tableBoard,
-    pool: initialPool,
+    pool: [],
     hasOpened: true,
   };
 
   it("accepts adding the blue 7 to the blue run", () => {
-    const seven = initialRack.find((entry) => entry.id === "cobalt-7-a")!;
+    const seven = fixtureRack.find((entry) => entry.id === "cobalt-7-a")!;
     const board = addTileToGroup(tableBoard, "blue-run", seven);
-    const rack = initialRack.filter((entry) => entry.id !== seven.id);
+    const rack = fixtureRack.filter((entry) => entry.id !== seven.id);
     expect(validateTurn(openedStart, board, rack)).toMatchObject({ legal: true, playedTileIds: [seven.id] });
   });
 
   it("inserts a legal lower tile at the beginning of a run instead of appending it", () => {
-    const nine = initialRack.find((entry) => entry.id === "terracotta-9-a")!;
+    const nine = fixtureRack.find((entry) => entry.id === "terracotta-9-a")!;
     const board = addTileToGroup(tableBoard, "red-run", nine);
     expect(board.find((entry) => entry.id === "red-run")?.tiles.map((entry) => entry.value))
       .toEqual([9, 10, 11, 12, 13]);
   });
 
   it("blocks an incompatible rack tile and an unfinished new meld", () => {
-    const nine = initialRack.find((entry) => entry.id === "terracotta-9-a")!;
+    const nine = fixtureRack.find((entry) => entry.id === "terracotta-9-a")!;
     const wrongBoard = addTileToGroup(tableBoard, "blue-run", nine);
-    expect(validateTurn(openedStart, wrongBoard, initialRack.filter((entry) => entry.id !== nine.id)).legal).toBe(false);
+    expect(validateTurn(openedStart, wrongBoard, fixtureRack.filter((entry) => entry.id !== nine.id)).legal).toBe(false);
 
     const draftBoard = addTileToGroup(tableBoard, "new-meld", nine);
-    expect(validateTurn(openedStart, draftBoard, initialRack.filter((entry) => entry.id !== nine.id)))
+    expect(validateTurn(openedStart, draftBoard, fixtureRack.filter((entry) => entry.id !== nine.id)))
       .toMatchObject({ legal: false, reason: "A meld needs 2 more tiles." });
   });
 
   it("allows table manipulation only when every resulting meld is legal", () => {
-    const seven = initialRack.find((entry) => entry.id === "cobalt-7-a")!;
+    const seven = fixtureRack.find((entry) => entry.id === "cobalt-7-a")!;
     const extended = addTileToGroup(tableBoard, "blue-run", seven);
     const moved = moveBoardTile(extended, "cobalt-4-a", "blue-run", "new-meld");
-    expect(validateTurn(openedStart, moved, initialRack.filter((entry) => entry.id !== seven.id)).legal).toBe(false);
+    expect(validateTurn(openedStart, moved, fixtureRack.filter((entry) => entry.id !== seven.id)).legal).toBe(false);
   });
 
   it("requires at least one rack tile per non-draw turn", () => {
-    expect(validateTurn(openedStart, tableBoard, initialRack))
+    expect(validateTurn(openedStart, tableBoard, fixtureRack))
       .toMatchObject({ legal: false, reason: "Play at least one rack tile, or draw to end the turn." });
   });
 
@@ -312,24 +302,24 @@ describe("turn rules", () => {
   });
 
   it("requires a 30-point opening made only from rack tiles", () => {
-    const tens = initialRack.filter((entry) => typeof entry.value === "number" && entry.value === 10).slice(0, 3);
+    const tens = fixtureRack.filter((entry) => typeof entry.value === "number" && entry.value === 10).slice(0, 3);
     const openingStart: TurnSnapshot = { ...openedStart, hasOpened: false };
     const openingBoard = tableBoard.map((entry) => entry.id === "new-meld" ? { ...entry, tiles: tens } : entry);
-    const openingRack = initialRack.filter((entry) => !tens.some((ten) => ten.id === entry.id));
+    const openingRack = fixtureRack.filter((entry) => !tens.some((ten) => ten.id === entry.id));
     expect(validateTurn(openingStart, openingBoard, openingRack))
       .toMatchObject({ legal: true, openingScore: 30, opensPlayer: true });
   });
 
   it("rejects an opening under 30 points or one that manipulates the table", () => {
     const lowRack = [tile("r5", 5, "terracotta"), tile("b5", 5, "cobalt"), tile("y5", 5, "marigold")];
-    const lowStart: TurnSnapshot = { rack: lowRack, board: tableBoard, pool: initialPool, hasOpened: false };
+    const lowStart: TurnSnapshot = { rack: lowRack, board: tableBoard, pool: [], hasOpened: false };
     const lowBoard = tableBoard.map((entry) => entry.id === "new-meld" ? { ...entry, tiles: lowRack } : entry);
     expect(validateTurn(lowStart, lowBoard, [])).toMatchObject({ legal: false, openingScore: 15 });
 
-    const seven = initialRack.find((entry) => entry.id === "cobalt-7-a")!;
+    const seven = fixtureRack.find((entry) => entry.id === "cobalt-7-a")!;
     const manipulated = addTileToGroup(tableBoard, "blue-run", seven);
     const notOpened: TurnSnapshot = { ...openedStart, hasOpened: false };
-    expect(validateTurn(notOpened, manipulated, initialRack.filter((entry) => entry.id !== seven.id)))
+    expect(validateTurn(notOpened, manipulated, fixtureRack.filter((entry) => entry.id !== seven.id)))
       .toMatchObject({ legal: false, reason: "Your opening meld cannot use or rearrange tiles already on the table." });
   });
 });
