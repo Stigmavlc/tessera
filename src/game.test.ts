@@ -391,6 +391,21 @@ describe("resolveTileDrop", () => {
       .toEqual([5, 6]);
   });
 
+  it("split halves inherit draft-ness: unsealed parents stay kind new, sealed runs stay run", () => {
+    const draftTiles = [8, 9, 10, 11].map((value) => tile(`terracotta-${value}`, value, "terracotta"));
+    const fromDraft = resolveTileDrop(
+      [{ id: "d", kind: "new", tiles: draftTiles }, group("new-meld", [])],
+      "d", [tile("r10b", 10, "terracotta")], undefined, "split-x",
+    );
+    expect(fromDraft.groups.find((entry) => entry.id === "split-x")?.kind).toBe("new");
+
+    const fromSealed = resolveTileDrop(
+      [{ id: "s", kind: "run", tiles: draftTiles }, group("new-meld", [])],
+      "s", [tile("r10c", 10, "terracotta")], undefined, "split-y",
+    );
+    expect(fromSealed.groups.find((entry) => entry.id === "split-y")?.kind).toBe("run");
+  });
+
   it("splits around a joker, which keeps its represented value in the left half", () => {
     const groups = [
       group("r", [tile("b9", 9, "cobalt"), tile("b10", 10, "cobalt"), tile("joker-a", "★", "joker"),

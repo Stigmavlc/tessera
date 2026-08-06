@@ -142,7 +142,10 @@ const tabletopCollision: CollisionDetection = (args) => {
   // pointer hit-testing makes tiny zoomed-out melds nearly impossible to hit.
   // When the felt would win, measure the dragged tile's rectangle against
   // every meld and tile target: hovering on or near one targets it instead.
-  if ((bestId === null || bestId === "board-drop") && args.collisionRect) {
+  // Pointer/touch drags only: keyboard drags have no pointerCoordinates and
+  // must keep the closestCenter fallback, or rack reordering gets hijacked
+  // by melds sitting within the grace gap of the rack.
+  if ((bestId === null || bestId === "board-drop") && args.pointerCoordinates && args.collisionRect) {
     const dragged = args.collisionRect;
     let nearest: { id: string; distance: number; rank: number } | null = null;
     for (const [id, rect] of args.droppableRects) {
@@ -728,7 +731,11 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     const movingTiles = rack.filter((entry) => movingIdSet.has(entry.id));
     if (movingTiles.length === 0) return;
     const destination = board.find((group) => group.id === groupId);
-    const isOwnOpeningDraft = destination?.kind === "new"
+    // Pre-opening, every table group made only of this turn's rack tiles is
+    // the player's own opening draft, whatever its kind — splits of an
+    // unsealed draft must stay finishable.
+    const isOwnOpeningDraft = destination !== undefined
+      && destination.tiles.length > 0
       && destination.tiles.every((entry) => returnableTileIds.has(entry.id));
     if (!hasOpened && groupId !== "new-meld" && !isOwnOpeningDraft) {
       setToast("Opening melds must use only rack tiles in a new set");
