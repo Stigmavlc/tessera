@@ -37,6 +37,7 @@ import {
   moveBoardTile,
   orderMeldTiles,
   playOpponentTurn,
+  resolveTileDrop,
   resolveTimeout,
   scoreRound,
   validateTurn,
@@ -640,19 +641,18 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       setSelectedIds([]);
       return;
     }
-    const candidateBoard = board.map((group) => {
-      if (group.id !== groupId) return group;
-      const nextTiles = [...group.tiles];
-      const insertionIndex = targetIndex === undefined
-        ? nextTiles.length
-        : Math.max(0, Math.min(targetIndex, nextTiles.length));
-      nextTiles.splice(insertionIndex, 0, ...movingTiles);
-      return { ...group, tiles: orderMeldTiles(nextTiles) };
-    });
+    const splitId = `split-${turnNumber}-${moveCount + 1}-${movingTiles[0].id}`;
+    const resolution = resolveTileDrop(board, groupId, movingTiles, targetIndex, splitId);
+    const candidateBoard = resolution.groups;
     remember();
     setRack((items) => items.filter((entry) => !movingIdSet.has(entry.id)));
     setBoard(candidateBoard);
-    setGroupPositions((current) => positionTableGroups(candidateBoard, current));
+    setGroupPositions((current) => {
+      const seeded = resolution.kind === "split" && current[groupId]
+        ? { ...current, [splitId]: { x: current[groupId].x + 12, y: current[groupId].y } }
+        : current;
+      return positionTableGroups(candidateBoard, seeded);
+    });
     setMoveCount((value) => value + movingTiles.length);
     setSelectedIds([]);
     if (haptics && "vibrate" in navigator) navigator.vibrate(14);
@@ -691,10 +691,31 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       return;
     }
     remember();
-    const nextBoard = moveBoardTile(board, tileId, fromGroupId, toGroupId, targetIndex)
+    if (fromGroupId === toGroupId) {
+      const nextBoard = moveBoardTile(board, tileId, fromGroupId, toGroupId, targetIndex)
+        .filter((group) => group.id === "new-meld" || group.tiles.length > 0);
+      setBoard(nextBoard);
+      setGroupPositions((current) => positionTableGroups(nextBoard, current));
+      setMoveCount((value) => value + 1);
+      return;
+    }
+    const movingTile = board.find((group) => group.id === fromGroupId)?.tiles
+      .find((entry) => entry.id === tileId);
+    if (!movingTile) return;
+    const removed = board.map((group) => group.id === fromGroupId
+      ? { ...group, tiles: group.tiles.filter((entry) => entry.id !== tileId) }
+      : group);
+    const splitId = `split-${turnNumber}-${moveCount + 1}-${tileId}`;
+    const resolution = resolveTileDrop(removed, toGroupId, [movingTile], targetIndex, splitId);
+    const nextBoard = resolution.groups
       .filter((group) => group.id === "new-meld" || group.tiles.length > 0);
     setBoard(nextBoard);
-    setGroupPositions((current) => positionTableGroups(nextBoard, current));
+    setGroupPositions((current) => {
+      const seeded = resolution.kind === "split" && current[toGroupId]
+        ? { ...current, [splitId]: { x: current[toGroupId].x + 12, y: current[toGroupId].y } }
+        : current;
+      return positionTableGroups(nextBoard, seeded);
+    });
     setMoveCount((value) => value + 1);
   };
 
