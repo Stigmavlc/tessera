@@ -45,6 +45,7 @@ import {
   scoreStalemate,
   validateTurn,
 } from "./game";
+import { playTick, setMusic } from "./audio";
 import { BoardCamera, TablePoint, TablePositions, groupFootprint, layoutLockedBoard } from "./layout";
 
 type Screen = "home" | "game";
@@ -494,7 +495,13 @@ function HomeScreen({ onPlay }: { onPlay: () => void }) {
   );
 }
 
-function GameScreen({ onBack }: { onBack: () => void }) {
+function GameScreen({ onBack, sound, haptics, onSoundChange, onHapticsChange }: {
+  onBack: () => void;
+  sound: boolean;
+  haptics: boolean;
+  onSoundChange: (value: boolean) => void;
+  onHapticsChange: (value: boolean) => void;
+}) {
   const [deal, setDeal] = useState<Deal>(() => createDeal());
   const [rack, setRack] = useState<Tile[]>(deal.rack);
   const [board, setBoard] = useState<BoardGroup[]>(cloneBoard(initialBoard));
@@ -529,8 +536,6 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   const [endedByStalemate, setEndedByStalemate] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [sound, setSound] = useState(true);
-  const [haptics, setHaptics] = useState(true);
   const [celebrating, setCelebrating] = useState(false);
 
   const selectedTiles = rack.filter((entry) => selectedIds.includes(entry.id));
@@ -731,6 +736,19 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     const timeout = window.setTimeout(() => setToast(null), 2400);
     return () => window.clearTimeout(timeout);
   }, [toast]);
+
+  // Last-10-seconds clock tick, louder as the turn runs out (Table sounds).
+  const lastTickRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (timer > 10 || timer <= 0) {
+      lastTickRef.current = null;
+      return;
+    }
+    if (!sound || turnState !== "you" || settingsOpen || winner) return;
+    if (lastTickRef.current === timer) return;
+    lastTickRef.current = timer;
+    playTick((10 - timer) / 10, timer % 2 === 0);
+  }, [timer, sound, turnState, settingsOpen, winner]);
 
   const remember = () => {
     setHistory((items) => [
@@ -1327,8 +1345,8 @@ function GameScreen({ onBack }: { onBack: () => void }) {
             >
               <div className="sheet-handle" />
               <div className="settings-sheet__heading"><BrandMark compact /><div><span>Table settings</span><strong>Keep the game feeling good.</strong></div></div>
-              <SettingRow label="Table sounds" description="Soft ceramic clicks and turn cues" value={sound} onChange={setSound} />
-              <SettingRow label="Haptic taps" description="A light pulse when a tile lands" value={haptics} onChange={setHaptics} />
+              <SettingRow label="Table sounds" description="Music and turn cues" value={sound} onChange={onSoundChange} />
+              <SettingRow label="Haptic taps" description="A light pulse when a tile lands" value={haptics} onChange={onHapticsChange} />
               <button className="reset-button" type="button" onClick={resetGame}>Reset this table</button>
               <button className="sheet-done" type="button" onClick={() => setSettingsOpen(false)}>Done</button>
             </motion.section>
@@ -1684,6 +1702,23 @@ function ConfettiBurst() {
 
 function App() {
   const [screen, setScreen] = useState<Screen>("home");
+  const [sound, setSound] = useState(() => localStorage.getItem("tessera.sound") !== "off");
+  const [haptics, setHaptics] = useState(() => localStorage.getItem("tessera.haptics") !== "off");
+
+  useEffect(() => {
+    localStorage.setItem("tessera.sound", sound ? "on" : "off");
+    localStorage.setItem("tessera.haptics", haptics ? "on" : "off");
+  }, [sound, haptics]);
+
+  // Background music follows the screen; the pointerdown re-kick satisfies
+  // autoplay policies (the first attempt before any gesture is blocked).
+  useEffect(() => {
+    const track = screen === "home" ? "lobby" as const : "table" as const;
+    setMusic(track, sound);
+    const kick = () => setMusic(track, sound);
+    window.addEventListener("pointerdown", kick);
+    return () => window.removeEventListener("pointerdown", kick);
+  }, [screen, sound]);
 
   return (
     <div className="app-stage">
@@ -1693,7 +1728,7 @@ function App() {
         <AnimatePresence mode="wait" initial={false}>
           {screen === "home"
             ? <HomeScreen key="home" onPlay={() => setScreen("game")} />
-            : <GameScreen key="game" onBack={() => setScreen("home")} />}
+            : <GameScreen key="game" onBack={() => setScreen("home")} sound={sound} haptics={haptics} onSoundChange={setSound} onHapticsChange={setHaptics} />}
         </AnimatePresence>
       </div>
       <p className="desktop-caption"><span>✦</span> A table made for touch <span>✦</span></p>
