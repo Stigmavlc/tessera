@@ -542,6 +542,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     setHistory([]);
     setMoveCount(0);
     setSelectedIds([]);
+    setTimer(60);
     const nextPasses = consecutivePasses + 1;
     if (nextPasses >= 3) {
       endByStalemate({ You: base.rack, Maya: opponentRacks.Maya, Leo: opponentRacks.Leo });
@@ -756,15 +757,17 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       setToast("Table rearrangement unlocks after your 30-point opening meld");
       return;
     }
-    remember();
     if (fromGroupId === toGroupId || tileIds.length > 1) {
-      const nextBoard = moveBoardTiles(board, tileIds, fromGroupId, toGroupId, targetIndex)
-        .filter((group) => group.id === "new-meld" || group.tiles.length > 0);
+      const movedBoard = moveBoardTiles(board, tileIds, fromGroupId, toGroupId, targetIndex);
+      if (movedBoard === board) return;
+      remember();
+      const nextBoard = movedBoard.filter((group) => group.id === "new-meld" || group.tiles.length > 0);
       setBoard(nextBoard);
       setGroupPositions((current) => positionTableGroups(nextBoard, current));
       setMoveCount((value) => value + 1);
       return;
     }
+    remember();
     const tileId = tileIds[0];
     const movingTile = board.find((group) => group.id === fromGroupId)?.tiles
       .find((entry) => entry.id === tileId);
@@ -800,7 +803,6 @@ function GameScreen({ onBack }: { onBack: () => void }) {
 
     if (movingTiles.length === source.tiles.length) {
       setGroupPositions((current) => positionTableGroups(board, { ...current, [fromGroupId]: position }));
-      setMoveCount((value) => value + 1);
       return;
     }
 
