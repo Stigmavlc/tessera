@@ -32,6 +32,7 @@
 - **Timing:** opponents think for a random 3–10 s per turn; 60 s player timer; timeout = auto-submit legal table / restore + draw 1 / pass when pool empty.
 - **Deferred cleanup batch** (from the final branch review, all minor): `insertIntoGroup` helper to kill 3× splice/clamp duplication, `MotionConfig reducedMotion="user"`, localStorage try/catch, `handleDraw` empty-pool guard, a few test gaps (sortRackByRuns non-mutation, joker-in-stalemate rack, 3-way tie, cross-group id collision), monotonic counter for split-id minting, `deal` state is write-only.
 - **Verification:** `npm test && npm run build` (build is the only typecheck; no linter). 47 tests green as of 2026-08-07.
+- **Deploy quirk:** pushes made via the gh-CLI OAuth token have not been triggering the Pages workflow's `on: push` — if `gh run list` shows no new run after a push, run `gh workflow run deploy.yml` (deploys current main). Verify with the bundle hash at the live URL.
 
 ## 5. Changelog
 
