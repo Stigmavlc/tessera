@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   BoardGroup,
   Deal,
+  DropResolution,
+  TileColor,
   TurnSnapshot,
   addTileToGroup,
   analyzeMeld,
@@ -17,6 +19,7 @@ import {
   playOpponentTurn,
   rackScore,
   resolveTimeout,
+  resolveTileDrop,
   scoreRound,
   seededRng,
   tile,
@@ -343,5 +346,66 @@ describe("createDeal", () => {
       .toEqual(createDeal(seededRng(7)).rack.map((entry) => entry.id));
     expect(createDeal(seededRng(8)).rack.map((entry) => entry.id))
       .not.toEqual(createDeal(seededRng(7)).rack.map((entry) => entry.id));
+  });
+});
+
+describe("resolveTileDrop", () => {
+  const run = (id: string, values: number[], color: Exclude<TileColor, "joker"> = "terracotta") =>
+    group(id, values.map((value) => tile(`${color}-${value}`, value, color)));
+
+  it("extends a run when the dropped tile fits", () => {
+    const groups = [run("r", [4, 5, 6], "cobalt"), group("new-meld", [])];
+    const result = resolveTileDrop(groups, "r", [tile("b7", 7, "cobalt")], undefined, "split-x");
+    expect(result.kind).toBe("extend");
+    expect(result.groups.find((entry) => entry.id === "r")?.tiles.map((entry) => entry.value))
+      .toEqual([4, 5, 6, 7]);
+  });
+
+  it("splits a run when a duplicate interior tile is dropped (rulebook example)", () => {
+    const groups = [run("r", [4, 5, 6, 7, 8]), group("new-meld", [])];
+    const result = resolveTileDrop(groups, "r", [tile("r6b", 6, "terracotta")], undefined, "split-x");
+    expect(result.kind).toBe("split");
+    const ids = result.groups.map((entry) => entry.id);
+    expect(ids.indexOf("split-x")).toBe(ids.indexOf("r") + 1);
+    expect(result.groups.find((entry) => entry.id === "r")?.tiles.map((entry) => entry.value))
+      .toEqual([4, 5, 6]);
+    expect(result.groups.find((entry) => entry.id === "split-x")?.tiles.map((entry) => entry.value))
+      .toEqual([6, 7, 8]);
+    expect(isValidBoard(result.groups)).toBe(true);
+  });
+
+  it("refuses a split that would leave a short half and falls back to draft", () => {
+    const groups = [run("r", [4, 5, 6]), group("new-meld", [])];
+    const result = resolveTileDrop(groups, "r", [tile("r5b", 5, "terracotta")], undefined, "split-x");
+    expect(result.kind).toBe("draft");
+    expect(result.groups.find((entry) => entry.id === "r")?.tiles).toHaveLength(4);
+  });
+
+  it("splits around a joker, which keeps its represented value in the left half", () => {
+    const groups = [
+      group("r", [tile("b9", 9, "cobalt"), tile("b10", 10, "cobalt"), tile("joker-a", "★", "joker"),
+        tile("b12", 12, "cobalt"), tile("b13", 13, "cobalt")]),
+      group("new-meld", []),
+    ];
+    const result = resolveTileDrop(groups, "r", [tile("b11", 11, "cobalt")], undefined, "split-x");
+    expect(result.kind).toBe("split");
+    expect(result.groups.find((entry) => entry.id === "r")?.tiles.map((entry) => entry.id))
+      .toEqual(["b9", "b10", "joker-a"]);
+    expect(result.groups.find((entry) => entry.id === "split-x")?.tiles.map((entry) => entry.id))
+      .toEqual(["b11", "b12", "b13"]);
+  });
+
+  it("never splits sets and never splits at run edges", () => {
+    const eights = group("s", [tile("r8", 8, "terracotta"), tile("k8", 8, "graphite"), tile("y8", 8, "marigold")]);
+    expect(resolveTileDrop([eights, group("new-meld", [])], "s",
+      [tile("r8b", 8, "terracotta")], undefined, "split-x").kind).toBe("draft");
+    const edge = [run("r", [10, 11, 12, 13]), group("new-meld", [])];
+    expect(resolveTileDrop(edge, "r", [tile("r13b", 13, "terracotta")], undefined, "split-x").kind).toBe("draft");
+  });
+
+  it("handles batches as extend-or-draft, never split", () => {
+    const groups = [run("r", [4, 5, 6, 7, 8]), group("new-meld", [])];
+    const batch = [tile("r6b", 6, "terracotta"), tile("r9b", 9, "terracotta")];
+    expect(resolveTileDrop(groups, "r", batch, undefined, "split-x").kind).toBe("draft");
   });
 });

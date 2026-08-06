@@ -328,6 +328,60 @@ export function moveBoardTile(
   });
 }
 
+export type DropResolution = { kind: "extend" | "split" | "draft"; groups: BoardGroup[] };
+
+const splitRunWithTile = (group: BoardGroup, dropped: Tile): { left: Tile[]; right: Tile[] } | null => {
+  const analysis = analyzeMeld(group.tiles);
+  if (!analysis.valid || analysis.type !== "run") return null;
+  if (dropped.color === "joker" || typeof dropped.value !== "number") return null;
+  const ordered = orderMeldTiles(group.tiles);
+  const firstRegularIndex = ordered.findIndex((entry) => entry.color !== "joker");
+  if (dropped.color !== ordered[firstRegularIndex].color) return null;
+  // Ordered valid runs are consecutive, so each slot's represented value is start + index.
+  const start = Number(ordered[firstRegularIndex].value) - firstRegularIndex;
+  const splitIndex = dropped.value - start;
+  if (splitIndex <= 0 || splitIndex >= ordered.length - 1) return null;
+  const left = ordered.slice(0, splitIndex + 1);
+  const right = [dropped, ...ordered.slice(splitIndex + 1)];
+  if (!analyzeMeld(left).valid || !analyzeMeld(right).valid) return null;
+  return { left, right };
+};
+
+export function resolveTileDrop(
+  groups: BoardGroup[],
+  groupId: string,
+  movingTiles: Tile[],
+  targetIndex: number | undefined,
+  newGroupId: string,
+): DropResolution {
+  const target = groups.find((group) => group.id === groupId);
+  if (!target || movingTiles.length === 0) return { kind: "draft", groups };
+
+  const insert = (): BoardGroup[] => groups.map((group) => {
+    if (group.id !== groupId) return group;
+    const nextTiles = [...group.tiles];
+    const insertionIndex = targetIndex === undefined
+      ? nextTiles.length
+      : Math.max(0, Math.min(targetIndex, nextTiles.length));
+    nextTiles.splice(insertionIndex, 0, ...movingTiles);
+    return { ...group, tiles: orderMeldTiles(nextTiles) };
+  });
+
+  if (movingTiles.length === 1) {
+    const split = splitRunWithTile(target, movingTiles[0]);
+    if (split) {
+      const nextGroups = groups.flatMap((group): BoardGroup[] => group.id === groupId
+        ? [{ ...group, tiles: split.left }, { id: newGroupId, kind: "run", tiles: split.right }]
+        : [group]);
+      return { kind: "split", groups: nextGroups };
+    }
+  }
+
+  if (analyzeMeld([...target.tiles, ...movingTiles]).valid) return { kind: "extend", groups: insert() };
+
+  return { kind: "draft", groups: insert() };
+}
+
 const sameIds = (first: Tile[], second: Tile[]) => {
   if (first.length !== second.length) return false;
   const secondIds = new Set(second.map((entry) => entry.id));
