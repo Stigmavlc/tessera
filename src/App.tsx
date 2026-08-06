@@ -42,8 +42,6 @@ import {
   resolveTimeout,
   scoreRound,
   scoreStalemate,
-  sortRackByGroups,
-  sortRackByRuns,
   validateTurn,
 } from "./game";
 import { BoardCamera, TablePoint, TablePositions, groupFootprint, layoutLockedBoard } from "./layout";
@@ -123,18 +121,47 @@ const positionTableGroups = (groups: BoardGroup[], current: TablePositions): Tab
   return positioned;
 };
 
+const collisionPriority = (id: string | number) => {
+  const value = String(id);
+  if (value.startsWith("board-target:")) return 0;
+  if (value.startsWith("group:")) return 1;
+  if (value !== "rack-drop" && value !== "board-drop") return 2;
+  if (value === "rack-drop") return 3;
+  return 4;
+};
+
+// How far (screen px) a dragged tile may hover from a meld and still target it.
+const MELD_HOVER_GRACE = 26;
+
 const tabletopCollision: CollisionDetection = (args) => {
   const collisions = pointerWithin(args);
+  const sorted = [...collisions].sort((first, second) => collisionPriority(first.id) - collisionPriority(second.id));
+  const bestId = sorted[0] ? String(sorted[0].id) : null;
+
+  // The felt contains the pointer whenever it is over the board, so bare
+  // pointer hit-testing makes tiny zoomed-out melds nearly impossible to hit.
+  // When the felt would win, measure the dragged tile's rectangle against
+  // every meld and tile target: hovering on or near one targets it instead.
+  if ((bestId === null || bestId === "board-drop") && args.collisionRect) {
+    const dragged = args.collisionRect;
+    let nearest: { id: string; distance: number; rank: number } | null = null;
+    for (const [id, rect] of args.droppableRects) {
+      const rank = collisionPriority(id);
+      if (rank > 1) continue;
+      const gapX = Math.max(rect.left - dragged.right, dragged.left - rect.right, 0);
+      const gapY = Math.max(rect.top - dragged.bottom, dragged.top - rect.bottom, 0);
+      const distance = Math.hypot(gapX, gapY);
+      if (distance > MELD_HOVER_GRACE) continue;
+      if (!nearest || distance < nearest.distance
+        || (distance === nearest.distance && rank < nearest.rank)) {
+        nearest = { id: String(id), distance, rank };
+      }
+    }
+    if (nearest) return [{ id: nearest.id }, ...sorted];
+  }
+
   if (collisions.length === 0) return closestCenter(args);
-  const priority = (id: string | number) => {
-    const value = String(id);
-    if (value.startsWith("board-target:")) return 0;
-    if (value.startsWith("group:")) return 1;
-    if (value !== "rack-drop" && value !== "board-drop") return 2;
-    if (value === "rack-drop") return 3;
-    return 4;
-  };
-  return [...collisions].sort((first, second) => priority(first.id) - priority(second.id));
+  return sorted;
 };
 
 const sealDraftSlot = (groups: BoardGroup[], id: string): BoardGroup[] => {
@@ -822,7 +849,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     setMoveCount((value) => value + 1);
   };
 
-  const returnTilesToRack = (tileIds: string[], fromGroupId: string) => {
+  const returnTilesToRack = (tileIds: string[], fromGroupId: string, insertIndex?: number) => {
     if (turnState !== "you") return;
     if (!tileIds.every((id) => returnableTileIds.has(id))) {
       setToast("Only tiles played from your rack this turn can come back");
@@ -843,10 +870,14 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     setBoard(nextBoard);
     setGroupPositions((current) => positionTableGroups(nextBoard, current));
     setRack((items) => {
-      const order = new Map(turnStart.rack.map((entry, index) => [entry.id, index]));
-      return [...items, ...returningTiles].sort(
-        (first, second) => (order.get(first.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(second.id) ?? Number.MAX_SAFE_INTEGER),
-      );
+      // Never re-sort the rack: the player's arrangement is theirs. Returned
+      // tiles land where they were dropped, or at the end.
+      const next = [...items];
+      const insertionIndex = insertIndex === undefined
+        ? next.length
+        : Math.max(0, Math.min(insertIndex, next.length));
+      next.splice(insertionIndex, 0, ...returningTiles);
+      return next;
     });
     setMoveCount((value) => Math.max(0, value - tileIds.length));
     setSelectedIds([]);
@@ -887,7 +918,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       : [];
 
     if (sourceType === "board-tile" && fromGroupId && rack.some((entry) => entry.id === overId)) {
-      returnTilesToRack(draggedBoardIds, fromGroupId);
+      returnTilesToRack(draggedBoardIds, fromGroupId, rack.findIndex((entry) => entry.id === overId));
       return;
     }
 
@@ -1121,10 +1152,6 @@ function GameScreen({ onBack }: { onBack: () => void }) {
           className={`rack-section ${rack.length > 14 ? "rack-section--compact" : ""} ${rack.length > 20 ? "rack-section--crowded" : ""}`}
           label={`Your tile rack. All ${rack.length} tiles visible`}
         >
-          <div className="rack-tools" aria-label="Sort your rack">
-            <button type="button" onClick={() => setRack(sortRackByGroups(rack))} aria-label="Sort into groups of one number">777</button>
-            <button type="button" onClick={() => setRack(sortRackByRuns(rack))} aria-label="Sort into colour runs">789</button>
-          </div>
           <div className="rack-shell">
             <div
               className="rack-grid"

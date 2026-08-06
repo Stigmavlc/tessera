@@ -167,3 +167,11 @@ README interaction list and CLAUDE.md (deterministic-deal notes, timeout descrip
 - `viewMode` is the only new persisted value; sound/haptics stay session-only.
 - Stalemate pass rule is pragmatic: with an empty pool, a player may pass even if a play technically exists (detecting "no legal play exists" for a human requires a solver; the official app does not enforce it either).
 - Timer behavior during opponent turns, undo semantics, and the permissive-drafting model are unchanged.
+
+## Post-release rulings (2026-08-06, v2 — partner feedback round)
+
+1. **Split relaxed:** a duplicate interior drop on a valid run ALWAYS splits at that point; halves may be incomplete drafts (red) until End Turn. The earlier "both halves must be legal runs" gate is repealed — it clumped 8-9-10-11 + 10 into one invalid draft instead of the 8-9-10 / 10-11 she plans around.
+2. **Hover-to-integrate drops:** collision detection measures the dragged tile's rectangle against melds with a 26px screen-space grace gap, so hovering on or near a run targets it (previously the felt won unless the fingertip was inside the meld's zoomed-out rect).
+3. **The rack is sacred:** nothing programmatically re-sorts the player's rack. Returned tiles insert at the drop position or append at the end (previously the whole rack snapped back to turn-start order on every return).
+4. **777/789 buttons removed** at the player's request; `sortRackByGroups`/`sortRackByRuns` stay in the engine, tested, unwired — candidate paid add-on later.
+5. **Tile ink separation:** terracotta → #c11f14 (clear red), marigold → #a3810a (golden yellow); tile faces only, app palette untouched — the two warm oranges were confusable at locked-view zoom.

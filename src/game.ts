@@ -331,10 +331,12 @@ const splitRunWithTile = (group: BoardGroup, dropped: Tile): { left: Tile[]; rig
   const start = Number(ordered[firstRegularIndex].value) - firstRegularIndex;
   const splitIndex = dropped.value - start;
   if (splitIndex <= 0 || splitIndex >= ordered.length - 1) return null;
-  const left = ordered.slice(0, splitIndex + 1);
-  const right = [dropped, ...ordered.slice(splitIndex + 1)];
-  if (!analyzeMeld(left).valid || !analyzeMeld(right).valid) return null;
-  return { left, right };
+  // Halves may be incomplete drafts (ruling 2026-08-06 v2): the player splits
+  // where the duplicate lands and finishes both halves before End Turn.
+  return {
+    left: ordered.slice(0, splitIndex + 1),
+    right: [dropped, ...ordered.slice(splitIndex + 1)],
+  };
 };
 
 export function resolveTileDrop(
