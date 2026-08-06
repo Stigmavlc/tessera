@@ -51,7 +51,7 @@ export type AITurnResult = {
   winsGame: boolean;
 };
 
-export type TimeoutOutcome = "submit" | "draw-one" | "penalty-three";
+export type TimeoutOutcome = "submit" | "draw-one" | "revert-draw-one";
 
 export const standardColors: Exclude<TileColor, "joker">[] = [
   "terracotta",
@@ -502,7 +502,7 @@ export function sortRackByRuns(rack: Tile[]): Tile[] {
 
 export function resolveTimeout(moveCount: number, tableIsLegal: boolean): TimeoutOutcome {
   if (moveCount === 0) return "draw-one";
-  return tableIsLegal ? "submit" : "penalty-three";
+  return tableIsLegal ? "submit" : "revert-draw-one";
 }
 
 export function scoreRound(winner: PlayerName, racks: Record<PlayerName, Tile[]>): Record<PlayerName, number> {

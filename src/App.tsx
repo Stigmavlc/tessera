@@ -552,9 +552,8 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    const penaltySize = timeoutOutcome === "penalty-three" ? 3 : 1;
     const base = cloneTurnSnapshot(turnStart);
-    const penaltyTiles = base.pool.slice(0, penaltySize);
+    const penaltyTiles = base.pool.slice(0, 1);
     const committed: TurnSnapshot = {
       ...base,
       rack: [...base.rack, ...penaltyTiles],
@@ -568,7 +567,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
     setHistory([]);
     setMoveCount(0);
     setSelectedIds([]);
-    setToast(timeoutOutcome === "penalty-three" ? "Incomplete table restored · 3-tile penalty" : "Time’s up · drew one tile");
+    setToast(timeoutOutcome === "revert-draw-one" ? "Time’s up · table restored · drew 1" : "Time’s up · drew one tile");
     setActiveOpponent("Leo");
     setTurnState("opponent");
   }, [timer, turnState, settingsOpen, winner, moveCount, turnValidation, hasOpened, board, turnNumber, turnStart, turnStartPositions]);
