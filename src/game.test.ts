@@ -3,6 +3,7 @@ import {
   BoardGroup,
   Deal,
   DropResolution,
+  StalemateResult,
   TileColor,
   TurnSnapshot,
   addTileToGroup,
@@ -22,6 +23,7 @@ import {
   resolveTimeout,
   resolveTileDrop,
   scoreRound,
+  scoreStalemate,
   seededRng,
   sortRackByGroups,
   sortRackByRuns,
@@ -459,5 +461,31 @@ describe("rack sorting", () => {
     const before = rack.map((entry) => entry.id);
     sortRackByGroups(rack);
     expect(rack.map((entry) => entry.id)).toEqual(before);
+  });
+});
+
+describe("scoreStalemate", () => {
+  it("awards the lowest rack the differential total", () => {
+    const result = scoreStalemate({
+      You: [tile("r5", 5, "terracotta")],
+      Leo: [tile("b3", 3, "cobalt")],
+      Maya: [tile("y3", 3, "marigold"), tile("y4", 4, "marigold")],
+    });
+    expect(result.winner).toBe("Leo");
+    expect(result.scores).toEqual({ You: -2, Leo: 6, Maya: -4 });
+    expect(Object.values(result.scores).reduce((total, value) => total + value, 0)).toBe(0);
+  });
+
+  it("breaks total ties by fewer tiles, then turn order", () => {
+    expect(scoreStalemate({
+      You: [tile("r2", 2, "terracotta"), tile("r3", 3, "terracotta")],
+      Leo: [tile("b5", 5, "cobalt")],
+      Maya: [tile("y9", 9, "marigold")],
+    }).winner).toBe("Leo");
+    expect(scoreStalemate({
+      You: [tile("r5", 5, "terracotta")],
+      Leo: [tile("b5", 5, "cobalt")],
+      Maya: [tile("y9", 9, "marigold")],
+    }).winner).toBe("You");
   });
 });

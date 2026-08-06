@@ -519,6 +519,27 @@ export function scoreRound(winner: PlayerName, racks: Record<PlayerName, Tile[]>
   ) as Record<PlayerName, number>;
 }
 
+export type StalemateResult = { winner: PlayerName; scores: Record<PlayerName, number> };
+
+// Pool-empty ending: lowest rack total wins; each loser scores the negative
+// difference to the winner, and the winner collects the sum (zero-sum).
+export function scoreStalemate(racks: Record<PlayerName, Tile[]>): StalemateResult {
+  const players: PlayerName[] = ["You", "Leo", "Maya"];
+  const winner = players.reduce((best, player) => {
+    const difference = rackScore(racks[player]) - rackScore(racks[best]);
+    if (difference < 0) return player;
+    if (difference === 0 && racks[player].length < racks[best].length) return player;
+    return best;
+  });
+  const winnerTotal = rackScore(racks[winner]);
+  const scores = Object.fromEntries(players.map((player) => [
+    player,
+    player === winner ? 0 : winnerTotal - rackScore(racks[player]),
+  ])) as Record<PlayerName, number>;
+  scores[winner] = -Object.values(scores).reduce((total, value) => total + value, 0);
+  return { winner, scores };
+}
+
 const cloneGroups = (groups: BoardGroup[]) => groups.map((group) => ({ ...group, tiles: [...group.tiles] }));
 
 const findRackMelds = (rack: Tile[]): Tile[][] => {
