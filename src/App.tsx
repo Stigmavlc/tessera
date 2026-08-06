@@ -658,6 +658,9 @@ function GameScreen({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (turnState !== "opponent" || winner) return;
     const actingOpponent = activeOpponent;
+    // Each opponent "thinks" for a random 3-10 seconds so their turns feel
+    // like a real player deliberating rather than an instant machine.
+    const thinkingDelay = 3000 + Math.random() * 7000;
     const timeout = window.setTimeout(() => {
       const result = playOpponentTurn({
         name: actingOpponent,
@@ -714,7 +717,7 @@ function GameScreen({ onBack }: { onBack: () => void }) {
       setHistory([]);
       setMoveCount(0);
       setSelectedIds([]);
-    }, 1050);
+    }, thinkingDelay);
     return () => window.clearTimeout(timeout);
   }, [turnState, winner, activeOpponent, opponentRacks, opponentOpened, board, pool, turnNumber, rack, hasOpened, groupPositions, consecutivePasses]);
 
