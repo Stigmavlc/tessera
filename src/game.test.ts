@@ -15,6 +15,7 @@ import {
   initialRack,
   isValidBoard,
   moveBoardTile,
+  moveBoardTiles,
   orderMeldTiles,
   playOpponentTurn,
   rackScore,
@@ -407,5 +408,31 @@ describe("resolveTileDrop", () => {
     const groups = [run("r", [4, 5, 6, 7, 8]), group("new-meld", [])];
     const batch = [tile("r6b", 6, "terracotta"), tile("r9b", 9, "terracotta")];
     expect(resolveTileDrop(groups, "r", batch, undefined, "split-x").kind).toBe("draft");
+  });
+});
+
+describe("moveBoardTiles", () => {
+  const board = () => [
+    group("a", [tile("b4", 4, "cobalt"), tile("b5", 5, "cobalt"), tile("b6", 6, "cobalt"),
+      tile("b7", 7, "cobalt"), tile("b8", 8, "cobalt")]),
+    group("b", [tile("r6", 6, "terracotta")]),
+    group("new-meld", []),
+  ];
+
+  it("moves a tail of tiles between groups and keeps meld ordering", () => {
+    const result = moveBoardTiles(board(), ["b7", "b8"], "a", "b");
+    expect(result.find((entry) => entry.id === "a")?.tiles.map((entry) => entry.id)).toEqual(["b4", "b5", "b6"]);
+    expect(result.find((entry) => entry.id === "b")?.tiles.map((entry) => entry.value)).toEqual([6, 7, 8]);
+  });
+
+  it("can empty the source group (caller filters it out)", () => {
+    const result = moveBoardTiles(board(), ["r6"], "b", "a");
+    expect(result.find((entry) => entry.id === "b")?.tiles).toHaveLength(0);
+  });
+
+  it("delegates single-tile same-group reorder and ignores same-group batches", () => {
+    expect(moveBoardTiles(board(), ["b7", "b8"], "a", "a", 0)).toEqual(board());
+    const reordered = moveBoardTiles(board(), ["b7"], "a", "a", 0);
+    expect(reordered.find((entry) => entry.id === "a")?.tiles.map((entry) => entry.value)).toEqual([4, 5, 6, 7, 8]);
   });
 });

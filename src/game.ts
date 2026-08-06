@@ -328,6 +328,40 @@ export function moveBoardTile(
   });
 }
 
+export function moveBoardTiles(
+  groups: BoardGroup[],
+  tileIds: string[],
+  fromGroupId: string,
+  toGroupId: string,
+  targetIndex?: number,
+): BoardGroup[] {
+  if (fromGroupId === toGroupId) {
+    return tileIds.length === 1
+      ? moveBoardTile(groups, tileIds[0], fromGroupId, toGroupId, targetIndex)
+      : groups;
+  }
+  const movingIdSet = new Set(tileIds);
+  const movingTiles = groups
+    .find((group) => group.id === fromGroupId)?.tiles
+    .filter((entry) => movingIdSet.has(entry.id)) ?? [];
+  if (movingTiles.length === 0) return groups;
+
+  return groups.map((group) => {
+    if (group.id === fromGroupId) {
+      return { ...group, tiles: group.tiles.filter((entry) => !movingIdSet.has(entry.id)) };
+    }
+    if (group.id === toGroupId) {
+      const nextTiles = [...group.tiles];
+      const insertionIndex = targetIndex === undefined
+        ? nextTiles.length
+        : Math.max(0, Math.min(targetIndex, nextTiles.length));
+      nextTiles.splice(insertionIndex, 0, ...movingTiles);
+      return { ...group, tiles: orderMeldTiles(nextTiles) };
+    }
+    return group;
+  });
+}
+
 export type DropResolution = { kind: "extend" | "split" | "draft"; groups: BoardGroup[] };
 
 const splitRunWithTile = (group: BoardGroup, dropped: Tile): { left: Tile[]; right: Tile[] } | null => {
