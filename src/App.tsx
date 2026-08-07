@@ -1779,9 +1779,15 @@ function App() {
   useEffect(() => {
     const track = screen === "home" ? "lobby" as const : "table" as const;
     setMusic(track, musicOn);
+    // Browsers only unlock audio from a completed gesture (click/keydown on
+    // iOS Safari especially — pointerdown does NOT count), so retry there.
     const kick = () => setMusic(track, musicOn);
-    window.addEventListener("pointerdown", kick);
-    return () => window.removeEventListener("pointerdown", kick);
+    window.addEventListener("click", kick);
+    window.addEventListener("keydown", kick);
+    return () => {
+      window.removeEventListener("click", kick);
+      window.removeEventListener("keydown", kick);
+    };
   }, [screen, musicOn]);
 
   return (

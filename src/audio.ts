@@ -70,73 +70,106 @@ export function playTilePlace() {
 
 export type MusicTrack = "lobby" | "table";
 
-const MUSIC_VOLUME = 0.4;
+const MUSIC_VOLUME = 0.22;
 const FADE_MS = 1200;
 
 let musicElement: HTMLAudioElement | null = null;
+let musicGain: GainNode | null = null;
 let currentTrack: MusicTrack | null = null;
-let fadeTimer: number | null = null;
+let switchTimer: number | null = null;
 const unavailable = new Set<MusicTrack>();
 
 const trackUrl = (track: MusicTrack) => `${import.meta.env.BASE_URL}audio/${track}.mp3`;
 
-const fadeTo = (element: HTMLAudioElement, target: number, onDone?: () => void) => {
-  if (fadeTimer !== null) window.clearInterval(fadeTimer);
-  const stepMs = 60;
-  const step = (target - element.volume) / (FADE_MS / stepMs);
-  fadeTimer = window.setInterval(() => {
-    const next = element.volume + step;
-    const done = step >= 0 ? next >= target : next <= target;
-    element.volume = done ? target : next;
-    if (done) {
-      if (fadeTimer !== null) window.clearInterval(fadeTimer);
-      fadeTimer = null;
-      onDone?.();
+const clearSwitch = () => {
+  if (switchTimer !== null) {
+    window.clearTimeout(switchTimer);
+    switchTimer = null;
+  }
+};
+
+// iOS ignores writes to HTMLMediaElement.volume, so all fading happens on a
+// Web Audio gain node instead, and every fade completes on the clock — never
+// by reading a volume back.
+const ensureMusicGraph = (element: HTMLAudioElement): GainNode | null => {
+  const ctx = ensureContext();
+  if (!ctx) return null;
+  if (!musicGain) {
+    const source = ctx.createMediaElementSource(element);
+    musicGain = ctx.createGain();
+    musicGain.gain.value = 0;
+    source.connect(musicGain);
+    musicGain.connect(ctx.destination);
+  }
+  return musicGain;
+};
+
+const rampMusic = (target: number, onDone?: () => void) => {
+  clearSwitch();
+  if (musicGain && context) {
+    const now = context.currentTime;
+    musicGain.gain.cancelScheduledValues(now);
+    musicGain.gain.setValueAtTime(musicGain.gain.value, now);
+    musicGain.gain.linearRampToValueAtTime(target, now + FADE_MS / 1000);
+  } else if (musicElement) {
+    try {
+      musicElement.volume = target;
+    } catch {
+      // Some platforms refuse element volume control entirely.
     }
-  }, stepMs);
+  }
+  if (onDone) switchTimer = window.setTimeout(onDone, FADE_MS + 40);
 };
 
 // Switches the looping background track (or stops it with `null`). Safe to
-// call repeatedly; must first be called after a user gesture for autoplay.
+// call repeatedly; the first call after a user click unlocks playback.
 export function setMusic(track: MusicTrack | null, enabled: boolean) {
   const desired = enabled ? track : null;
 
   if (desired === null) {
     if (musicElement && currentTrack !== null) {
       const element = musicElement;
-      fadeTo(element, 0, () => element.pause());
+      rampMusic(0, () => element.pause());
     }
     currentTrack = null;
     return;
   }
 
   if (unavailable.has(desired)) return;
-  if (desired === currentTrack && musicElement && !musicElement.paused) return;
+  if (desired === currentTrack && musicElement && !musicElement.paused) {
+    ensureContext();
+    return;
+  }
 
-  const start = () => {
+  const begin = () => {
     const element = musicElement ?? new Audio();
     musicElement = element;
     element.loop = true;
     element.src = trackUrl(desired);
-    element.volume = 0;
     element.onerror = () => {
       unavailable.add(desired);
       if (currentTrack === desired) currentTrack = null;
     };
-    element.play().then(() => fadeTo(element, MUSIC_VOLUME)).catch(() => {
+    const gain = ensureMusicGraph(element);
+    if (!gain) element.volume = MUSIC_VOLUME;
+    element.play().then(() => {
+      rampMusic(MUSIC_VOLUME);
+    }).catch(() => {
       // Autoplay blocked — the next user-gesture-driven call will succeed.
       if (currentTrack === desired) currentTrack = null;
     });
     currentTrack = desired;
   };
 
+  clearSwitch();
   if (musicElement && currentTrack !== null && !musicElement.paused) {
     const element = musicElement;
-    fadeTo(element, 0, () => {
+    rampMusic(0, () => {
       element.pause();
-      start();
+      begin();
     });
+    currentTrack = desired;
   } else {
-    start();
+    begin();
   }
 }
