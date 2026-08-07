@@ -1606,3 +1606,71 @@ button:focus-visible,
     transition-duration: 0.01ms !important;
   }
 }
+
+.screen-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  background: #171410;
+  pointer-events: auto;
+}
+
+.audio-toggle {
+  display: grid;
+  position: relative;
+  width: 37px;
+  aspect-ratio: 1;
+  place-items: center;
+  padding: 0;
+  border: 1.5px solid rgba(255, 249, 237, 0.5);
+  border-radius: 50%;
+  background: rgba(24, 38, 20, 0.38);
+  color: var(--cream-bright);
+  cursor: pointer;
+}
+
+.audio-toggle svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.audio-toggle--off { opacity: 0.6; }
+
+.audio-toggle--off::before {
+  position: absolute;
+  width: 21px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  content: "";
+  transform: rotate(-45deg);
+}
+
+.board-audio {
+  position: absolute;
+  top: 13px;
+  right: 15px;
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+}
+
+.home-audio {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+}
+
+.home-audio .audio-toggle {
+  border-color: rgba(38, 37, 34, 0.28);
+  background: rgba(255, 249, 237, 0.75);
+  color: var(--graphite);
+}

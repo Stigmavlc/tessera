@@ -44,10 +44,34 @@ export function playTick(urgency: number, alternate: boolean) {
   osc.stop(now + 0.07);
 }
 
+// A soft ceramic click for a tile landing on the table.
+export function playTilePlace() {
+  const ctx = ensureContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const length = Math.floor(ctx.sampleRate * 0.05);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let index = 0; index < length; index += 1) {
+    data[index] = (Math.random() * 2 - 1) * (1 - index / length) ** 2;
+  }
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 2600;
+  const gain = ctx.createGain();
+  gain.gain.value = 0.22;
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  source.start(now);
+}
+
 export type MusicTrack = "lobby" | "table";
 
 const MUSIC_VOLUME = 0.4;
-const FADE_MS = 900;
+const FADE_MS = 1200;
 
 let musicElement: HTMLAudioElement | null = null;
 let currentTrack: MusicTrack | null = null;

@@ -37,6 +37,9 @@
 ## 5. Changelog
 
 ### 2026-08-07
+- Audio: ElevenLabs music (lobby + table tracks, 6+ min each, looping with crossfade), fade-to-black screen transition with music handoff, synthesized turn-clock tick (last 10 s, rising volume), ceramic tile-place click
+- Audio controls: music / SFX split into separate persisted settings with always-visible icon toggles on the home hero and the game felt, plus the settings sheet
+- Identity: app icon (brand-mark tile via Higgsfield), favicon, apple-touch-icon, PWA manifest — installs as "Tessera" from Add to Home Screen
 - Settings sheet: swipe/drag down to dismiss
 - Opponents: random 3–10 s thinking delay per turn
 - Arrows: circled ↗ replaced with clean inline arrows (Play now, Play again)
