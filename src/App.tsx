@@ -45,7 +45,7 @@ import {
   scoreStalemate,
   validateTurn,
 } from "./game";
-import { playTick, setMusic } from "./audio";
+import { playTick, playTilePlace, setMusic } from "./audio";
 import { BoardCamera, TablePoint, TablePositions, groupFootprint, layoutLockedBoard } from "./layout";
 
 type Screen = "home" | "game";
@@ -415,7 +415,40 @@ function DroppableGroup({
   );
 }
 
-function HomeScreen({ onPlay }: { onPlay: () => void }) {
+function AudioToggle({ kind, on, onChange }: {
+  kind: "music" | "sfx";
+  on: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  const label = kind === "music"
+    ? on ? "Turn background music off" : "Turn background music on"
+    : on ? "Turn sound effects off" : "Turn sound effects on";
+  return (
+    <button
+      className={`audio-toggle ${on ? "" : "audio-toggle--off"}`}
+      type="button"
+      aria-label={label}
+      aria-pressed={on}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        onChange(!on);
+      }}
+    >
+      {kind === "music"
+        ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5.5L19 4v12" /><circle cx="6.6" cy="18" r="2.5" /><circle cx="16.6" cy="16" r="2.5" /></svg>
+        : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 9.5v5H8l5 4v-13l-5 4z" /><path d="M16.5 9a4.4 4.4 0 0 1 0 6" /></svg>}
+    </button>
+  );
+}
+
+function HomeScreen({ onPlay, musicOn, sfxOn, onMusicChange, onSfxChange }: {
+  onPlay: () => void;
+  musicOn: boolean;
+  sfxOn: boolean;
+  onMusicChange: (value: boolean) => void;
+  onSfxChange: (value: boolean) => void;
+}) {
   const heroTiles = useMemo(
     () => [
       { id: "hero-4", value: 4, color: "terracotta" as const },
@@ -442,6 +475,10 @@ function HomeScreen({ onPlay }: { onPlay: () => void }) {
           <span />
         </div>
         <BrandMark />
+        <div className="home-audio">
+          <AudioToggle kind="music" on={musicOn} onChange={onMusicChange} />
+          <AudioToggle kind="sfx" on={sfxOn} onChange={onSfxChange} />
+        </div>
         <div className="terra-field" aria-hidden="true">
           <div className="hero-tile-run">
             {heroTiles.map((entry, index) => (
@@ -495,11 +532,13 @@ function HomeScreen({ onPlay }: { onPlay: () => void }) {
   );
 }
 
-function GameScreen({ onBack, sound, haptics, onSoundChange, onHapticsChange }: {
+function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChange, onHapticsChange }: {
   onBack: () => void;
-  sound: boolean;
+  musicOn: boolean;
+  sfxOn: boolean;
   haptics: boolean;
-  onSoundChange: (value: boolean) => void;
+  onMusicChange: (value: boolean) => void;
+  onSfxChange: (value: boolean) => void;
   onHapticsChange: (value: boolean) => void;
 }) {
   const [deal, setDeal] = useState<Deal>(() => createDeal());
@@ -744,11 +783,11 @@ function GameScreen({ onBack, sound, haptics, onSoundChange, onHapticsChange }: 
       lastTickRef.current = null;
       return;
     }
-    if (!sound || turnState !== "you" || settingsOpen || winner) return;
+    if (!sfxOn || turnState !== "you" || settingsOpen || winner) return;
     if (lastTickRef.current === timer) return;
     lastTickRef.current = timer;
     playTick((10 - timer) / 10, timer % 2 === 0);
-  }, [timer, sound, turnState, settingsOpen, winner]);
+  }, [timer, sfxOn, turnState, settingsOpen, winner]);
 
   const remember = () => {
     setHistory((items) => [
@@ -788,6 +827,7 @@ function GameScreen({ onBack, sound, haptics, onSoundChange, onHapticsChange }: 
     });
     setMoveCount((value) => value + movingTiles.length);
     setSelectedIds([]);
+    if (sfxOn) playTilePlace();
     if (haptics && "vibrate" in navigator) navigator.vibrate(14);
   };
 
@@ -809,6 +849,7 @@ function GameScreen({ onBack, sound, haptics, onSoundChange, onHapticsChange }: 
     setGroupPositions((current) => positionTableGroups(nextBoard, { ...current, [groupId]: position }));
     setMoveCount((value) => value + movingTiles.length);
     setSelectedIds([]);
+    if (sfxOn) playTilePlace();
     if (haptics && "vibrate" in navigator) navigator.vibrate(14);
   };
 
@@ -1171,6 +1212,12 @@ function GameScreen({ onBack, sound, haptics, onSoundChange, onHapticsChange }: 
           empty={boardIsEmpty}
           onTableTap={handleTableTap}
           camera={viewMode === "locked" ? lockedLayout.camera : boardCamera}
+          audioControls={
+            <>
+              <AudioToggle kind="music" on={musicOn} onChange={onMusicChange} />
+              <AudioToggle kind="sfx" on={sfxOn} onChange={onSfxChange} />
+            </>
+          }
           onCameraChange={setBoardCamera}
           viewMode={viewMode}
           onToggleViewMode={toggleViewMode}
@@ -1345,7 +1392,8 @@ function GameScreen({ onBack, sound, haptics, onSoundChange, onHapticsChange }: 
             >
               <div className="sheet-handle" />
               <div className="settings-sheet__heading"><BrandMark compact /><div><span>Table settings</span><strong>Keep the game feeling good.</strong></div></div>
-              <SettingRow label="Table sounds" description="Music and turn cues" value={sound} onChange={onSoundChange} />
+              <SettingRow label="Background music" description="Tavern tunes for lobby and table" value={musicOn} onChange={onMusicChange} />
+              <SettingRow label="Sound effects" description="Ceramic clicks and the turn clock" value={sfxOn} onChange={onSfxChange} />
               <SettingRow label="Haptic taps" description="A light pulse when a tile lands" value={haptics} onChange={onHapticsChange} />
               <button className="reset-button" type="button" onClick={resetGame}>Reset this table</button>
               <button className="sheet-done" type="button" onClick={() => setSettingsOpen(false)}>Done</button>
@@ -1366,6 +1414,7 @@ function BoardDropZone({
   onCameraChange,
   viewMode,
   onToggleViewMode,
+  audioControls,
   onMeasure,
 }: {
   children: React.ReactNode;
@@ -1376,6 +1425,7 @@ function BoardDropZone({
   onCameraChange: (camera: BoardCamera) => void;
   viewMode: "locked" | "free";
   onToggleViewMode: () => void;
+  audioControls: React.ReactNode;
   onMeasure: (size: { width: number; height: number }) => void;
 }) {
   const { isOver, setNodeRef } = useDroppable({ id: "board-drop", data: { type: "board" } });
@@ -1610,6 +1660,7 @@ function BoardDropZone({
         });
       }}
     >
+      <div className="board-audio">{audioControls}</div>
       {children}
       <motion.div
         className="board-world"
@@ -1702,23 +1753,36 @@ function ConfettiBurst() {
 
 function App() {
   const [screen, setScreen] = useState<Screen>("home");
-  const [sound, setSound] = useState(() => localStorage.getItem("tessera.sound") !== "off");
+  const [fadeTarget, setFadeTarget] = useState<Screen | null>(null);
+  const [musicOn, setMusicOn] = useState(() =>
+    (localStorage.getItem("tessera.music") ?? localStorage.getItem("tessera.sound") ?? "on") !== "off");
+  const [sfxOn, setSfxOn] = useState(() =>
+    (localStorage.getItem("tessera.sfx") ?? localStorage.getItem("tessera.sound") ?? "on") !== "off");
   const [haptics, setHaptics] = useState(() => localStorage.getItem("tessera.haptics") !== "off");
 
   useEffect(() => {
-    localStorage.setItem("tessera.sound", sound ? "on" : "off");
+    localStorage.setItem("tessera.music", musicOn ? "on" : "off");
+    localStorage.setItem("tessera.sfx", sfxOn ? "on" : "off");
     localStorage.setItem("tessera.haptics", haptics ? "on" : "off");
-  }, [sound, haptics]);
+  }, [musicOn, sfxOn, haptics]);
+
+  // Fade-to-black screen change: music starts crossfading the moment the
+  // player taps, the screens swap under full black, then the table fades in.
+  const changeScreen = (next: Screen) => {
+    if (next === screen || fadeTarget !== null) return;
+    setMusic(next === "home" ? "lobby" : "table", musicOn);
+    setFadeTarget(next);
+  };
 
   // Background music follows the screen; the pointerdown re-kick satisfies
   // autoplay policies (the first attempt before any gesture is blocked).
   useEffect(() => {
     const track = screen === "home" ? "lobby" as const : "table" as const;
-    setMusic(track, sound);
-    const kick = () => setMusic(track, sound);
+    setMusic(track, musicOn);
+    const kick = () => setMusic(track, musicOn);
     window.addEventListener("pointerdown", kick);
     return () => window.removeEventListener("pointerdown", kick);
-  }, [screen, sound]);
+  }, [screen, musicOn]);
 
   return (
     <div className="app-stage">
@@ -1727,8 +1791,25 @@ function App() {
       <div className="phone-shell">
         <AnimatePresence mode="wait" initial={false}>
           {screen === "home"
-            ? <HomeScreen key="home" onPlay={() => setScreen("game")} />
-            : <GameScreen key="game" onBack={() => setScreen("home")} sound={sound} haptics={haptics} onSoundChange={setSound} onHapticsChange={setHaptics} />}
+            ? <HomeScreen key="home" onPlay={() => changeScreen("game")} musicOn={musicOn} sfxOn={sfxOn} onMusicChange={setMusicOn} onSfxChange={setSfxOn} />
+            : <GameScreen key="game" onBack={() => changeScreen("home")} musicOn={musicOn} sfxOn={sfxOn} haptics={haptics} onMusicChange={setMusicOn} onSfxChange={setSfxOn} onHapticsChange={setHaptics} />}
+        </AnimatePresence>
+        <AnimatePresence>
+          {fadeTarget && (
+            <motion.div
+              className="screen-fade"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0.5, delay: 0.55, ease: "easeInOut" } }}
+              transition={{ duration: 0.38, ease: "easeInOut" }}
+              onAnimationComplete={(definition) => {
+                if ((definition as { opacity?: number }).opacity === 1) {
+                  setScreen(fadeTarget);
+                  setFadeTarget(null);
+                }
+              }}
+            />
+          )}
         </AnimatePresence>
       </div>
       <p className="desktop-caption"><span>✦</span> A table made for touch <span>✦</span></p>
