@@ -70,7 +70,7 @@ export function playTilePlace() {
 
 export type MusicTrack = "lobby" | "table";
 
-const MUSIC_VOLUME = 0.22;
+const MUSIC_VOLUME = 0.1;
 const FADE_MS = 1200;
 
 let musicElement: HTMLAudioElement | null = null;

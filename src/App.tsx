@@ -1754,6 +1754,7 @@ function ConfettiBurst() {
 function App() {
   const [screen, setScreen] = useState<Screen>("home");
   const [fadeTarget, setFadeTarget] = useState<Screen | null>(null);
+  const [entered, setEntered] = useState(false);
   const [musicOn, setMusicOn] = useState(() =>
     (localStorage.getItem("tessera.music") ?? localStorage.getItem("tessera.sound") ?? "on") !== "off");
   const [sfxOn, setSfxOn] = useState(() =>
@@ -1815,6 +1816,21 @@ function App() {
                 }
               }}
             />
+          )}
+        </AnimatePresence>
+        <AnimatePresence>
+          {!entered && (
+            <motion.button
+              className="enter-splash"
+              type="button"
+              aria-label="Enter Tessera"
+              initial={false}
+              exit={{ opacity: 0, transition: { duration: 0.6, ease: "easeOut" } }}
+              onClick={() => setEntered(true)}
+            >
+              <BrandMark />
+              <span className="enter-splash__hint">Tap to begin</span>
+            </motion.button>
           )}
         </AnimatePresence>
       </div>
