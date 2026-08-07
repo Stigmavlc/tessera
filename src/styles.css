@@ -1674,3 +1674,36 @@ button:focus-visible,
   background: rgba(255, 249, 237, 0.75);
   color: var(--graphite);
 }
+
+.enter-splash {
+  display: grid;
+  position: absolute;
+  z-index: 70;
+  inset: 0;
+  place-content: center;
+  justify-items: center;
+  gap: 20px;
+  padding: 0;
+  border: 0;
+  background: var(--cream-bright);
+  cursor: pointer;
+}
+
+.enter-splash .brand {
+  padding-top: 0;
+}
+
+.enter-splash__hint {
+  color: var(--terra-deep);
+  font-family: var(--serif);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  animation: splash-pulse 1.9s ease-in-out infinite;
+}
+
+@keyframes splash-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
