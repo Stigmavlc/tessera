@@ -1,16 +1,12 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
-  type CollisionDetection,
   DragEndEvent,
   DragOverEvent,
   DragOverlay,
   DragStartEvent,
   KeyboardSensor,
   PointerSensor,
-  TouchSensor,
-  closestCenter,
-  pointerWithin,
   useDraggable,
   useDroppable,
   useSensor,
@@ -18,7 +14,6 @@ import {
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  arrayMove,
   rectSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
@@ -43,10 +38,13 @@ import {
   resolveTimeout,
   scoreRound,
   scoreStalemate,
+  sortRackByGroups,
+  sortRackByRuns,
   validateTurn,
 } from "./game";
 import { playTick, playTilePlace, setMusic } from "./audio";
-import { BoardCamera, TablePoint, TablePositions, groupFootprint, layoutLockedBoard } from "./layout";
+import { BoardCamera, TablePoint, TablePositions, positionTableGroups as arrangeTableGroups } from "./layout";
+import { centerDragOnPointer, moveRackSelection, pointerPosition, tabletopCollision, withRackOrder, worldPoint } from "./interactions";
 
 type Screen = "home" | "game";
 type TurnState = "you" | "opponent";
@@ -80,100 +78,6 @@ const localPlayerName = (new URLSearchParams(window.location.search).get("name")
 const localPlayerInitial = localPlayerName.charAt(0).toUpperCase();
 
 const defaultCamera: BoardCamera = { x: 0, y: 6, zoom: 0.58 };
-const tableSlots: TablePoint[] = [
-  { x: 18, y: 12 }, { x: 50, y: 12 }, { x: 82, y: 12 },
-  { x: 18, y: 30 }, { x: 50, y: 30 }, { x: 82, y: 30 },
-  { x: 18, y: 48 }, { x: 50, y: 48 }, { x: 82, y: 48 },
-  { x: 18, y: 66 }, { x: 50, y: 66 }, { x: 82, y: 66 },
-  { x: 18, y: 84 }, { x: 50, y: 84 }, { x: 82, y: 84 },
-];
-
-const positionsOverlap = (
-  first: TablePoint,
-  firstSize: ReturnType<typeof groupFootprint>,
-  second: TablePoint,
-  secondSize: ReturnType<typeof groupFootprint>,
-) => Math.abs(first.x - second.x) < (firstSize.width + secondSize.width) / 2 + 2
-  && Math.abs(first.y - second.y) < (firstSize.height + secondSize.height) / 2 + 2;
-
-const findOpenTablePoint = (
-  desired: TablePoint,
-  tileCount: number,
-  placed: Array<{ point: TablePoint; tileCount: number }>,
-): TablePoint => {
-  const size = groupFootprint(tileCount);
-  const clampPoint = (point: TablePoint): TablePoint => ({
-    x: Math.max(size.width / 2 + 2, Math.min(98 - size.width / 2, point.x)),
-    y: Math.max(9, Math.min(91, point.y)),
-  });
-  const candidates = [clampPoint(desired), ...tableSlots.map(clampPoint)];
-  return candidates.find((candidate) => placed.every((entry) => !positionsOverlap(
-    candidate,
-    size,
-    entry.point,
-    groupFootprint(entry.tileCount),
-  ))) ?? clampPoint(desired);
-};
-
-const positionTableGroups = (groups: BoardGroup[], current: TablePositions): TablePositions => {
-  const occupied = groups.filter((group) => group.tiles.length > 0);
-  const positioned: TablePositions = {};
-  const placed: Array<{ point: TablePoint; tileCount: number }> = [];
-  occupied.forEach((group, index) => {
-    const desired = current[group.id] ?? tableSlots[index % tableSlots.length];
-    const point = findOpenTablePoint(desired, group.tiles.length, placed);
-    positioned[group.id] = point;
-    placed.push({ point, tileCount: group.tiles.length });
-  });
-  return positioned;
-};
-
-const collisionPriority = (id: string | number) => {
-  const value = String(id);
-  if (value.startsWith("board-target:")) return 0;
-  if (value.startsWith("group:")) return 1;
-  if (value !== "rack-drop" && value !== "board-drop") return 2;
-  if (value === "rack-drop") return 3;
-  return 4;
-};
-
-// How far (screen px) a dragged tile may hover from a meld and still target it.
-const MELD_HOVER_GRACE = 26;
-
-const tabletopCollision: CollisionDetection = (args) => {
-  const collisions = pointerWithin(args);
-  const sorted = [...collisions].sort((first, second) => collisionPriority(first.id) - collisionPriority(second.id));
-  const bestId = sorted[0] ? String(sorted[0].id) : null;
-
-  // The felt contains the pointer whenever it is over the board, so bare
-  // pointer hit-testing makes tiny zoomed-out melds nearly impossible to hit.
-  // When the felt would win, measure the dragged tile's rectangle against
-  // every meld and tile target: hovering on or near one targets it instead.
-  // Pointer/touch drags only: keyboard drags have no pointerCoordinates and
-  // must keep the closestCenter fallback, or rack reordering gets hijacked
-  // by melds sitting within the grace gap of the rack.
-  if ((bestId === null || bestId === "board-drop") && args.pointerCoordinates && args.collisionRect) {
-    const dragged = args.collisionRect;
-    let nearest: { id: string; distance: number; rank: number } | null = null;
-    for (const [id, rect] of args.droppableRects) {
-      const rank = collisionPriority(id);
-      if (rank > 1) continue;
-      const gapX = Math.max(rect.left - dragged.right, dragged.left - rect.right, 0);
-      const gapY = Math.max(rect.top - dragged.bottom, dragged.top - rect.bottom, 0);
-      const distance = Math.hypot(gapX, gapY);
-      if (distance > MELD_HOVER_GRACE) continue;
-      if (!nearest || distance < nearest.distance
-        || (distance === nearest.distance && rank < nearest.rank)) {
-        nearest = { id: String(id), distance, rank };
-      }
-    }
-    if (nearest) return [{ id: nearest.id }, ...sorted];
-  }
-
-  if (collisions.length === 0) return closestCenter(args);
-  return sorted;
-};
-
 const sealDraftSlot = (groups: BoardGroup[], id: string): BoardGroup[] => {
   const occupied = groups
     .filter((group) => group.tiles.length > 0)
@@ -249,31 +153,71 @@ function TileFace({
   );
 }
 
-function SortableTile({ tile, selected, onSelect }: { tile: Tile; selected: boolean; onSelect: () => void }) {
+function SortableTile({ tile, selected, lifted, onSelect, onExtend }: {
+  tile: Tile; selected: boolean; lifted: boolean; onSelect: () => void; onExtend: (count: number) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tile.id,
     data: { type: "rack-tile", tile },
   });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const holdTimer = useRef<number | undefined>(undefined);
+  const holdStarted = useRef(false);
+  const origin = useRef<TablePoint | null>(null);
+  const extendRef = useRef(onExtend);
+  extendRef.current = onExtend;
+  const stopHold = () => { window.clearTimeout(holdTimer.current); origin.current = null; };
+  useEffect(() => {
+    window.addEventListener("pointerup", stopHold);
+    window.addEventListener("pointercancel", stopHold);
+    window.addEventListener("blur", stopHold);
+    document.addEventListener("visibilitychange", stopHold);
+    return () => {
+      stopHold();
+      window.removeEventListener("pointerup", stopHold);
+      window.removeEventListener("pointercancel", stopHold);
+      window.removeEventListener("blur", stopHold);
+      document.removeEventListener("visibilitychange", stopHold);
+    };
+  }, []);
+  useEffect(() => { if (isDragging) stopHold(); }, [isDragging]);
 
   return (
-    <motion.button
+    <button
       ref={setNodeRef}
-      style={style}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
       type="button"
-      className={`rack-tile ${isDragging ? "rack-tile--dragging" : ""}`}
-      onClick={onSelect}
+      className={`rack-tile ${isDragging || lifted ? "rack-tile--dragging" : ""}`}
+      data-tile-id={tile.id}
+      onClick={() => {
+        if (holdStarted.current) { holdStarted.current = false; return; }
+        onSelect();
+      }}
       aria-label={`${tile.color} ${tile.value} tile${selected ? ", selected" : ""}`}
-      whileTap={{ scale: 0.94 }}
       {...attributes}
       {...listeners}
+      aria-pressed={selected}
+      onContextMenu={(event) => event.preventDefault()}
+      onPointerDown={(event) => {
+        listeners?.onPointerDown?.(event);
+        if (!event.isPrimary || event.button !== 0) return;
+        stopHold();
+        holdStarted.current = false;
+        origin.current = { x: event.clientX, y: event.clientY };
+        let count = 1;
+        const extend = () => {
+          holdStarted.current = true;
+          extendRef.current(count++);
+          holdTimer.current = window.setTimeout(extend, 180);
+        };
+        holdTimer.current = window.setTimeout(extend, 300);
+      }}
+      onPointerMove={(event) => {
+        if (origin.current && Math.hypot(event.clientX - origin.current.x, event.clientY - origin.current.y) > 4) stopHold();
+      }}
+      onPointerLeave={stopHold}
     >
       <TileFace tile={tile} selected={selected} />
-    </motion.button>
+    </button>
   );
 }
 
@@ -310,6 +254,7 @@ function DraggableBoardTile({
         ref={setNodeRef}
         style={{ transform: CSS.Translate.toString(transform) }}
         className={`board-tile ${isDragging ? "board-tile--dragging" : ""} ${isOver ? "board-tile--over" : ""} ${lifted ? "board-tile--tail-lifted" : ""}`}
+        data-tile-id={tile.id}
         aria-label={`${tile.color} ${tile.value} table tile`}
         {...attributes}
         {...listeners}
@@ -389,10 +334,10 @@ function DroppableGroup({
         {group.tiles.map((entry, index) => (
           <motion.div
             key={entry.id}
-            initial={{ opacity: 0, y: 24, scale: 0.7, rotate: -8 }}
-            animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
-            exit={{ opacity: 0, y: 20, scale: 0.8 }}
-            transition={{ type: "spring", stiffness: 440, damping: 27 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.09 }}
           >
             <DraggableBoardTile
               tile={entry}
@@ -566,6 +511,18 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
   const [viewMode, setViewMode] = useState<"locked" | "free">(() =>
     localStorage.getItem("tessera.viewMode") === "free" ? "free" : "locked");
   const [stageSize, setStageSize] = useState({ width: 390, height: 480 });
+  const [landscape, setLandscape] = useState(() => window.matchMedia("(orientation: landscape) and (max-height: 600px)").matches);
+  const [overlaySize, setOverlaySize] = useState({ width: 46, height: 62 });
+  const rackRef = useRef(rack);
+  rackRef.current = rack;
+  useEffect(() => {
+    const query = window.matchMedia("(orientation: landscape) and (max-height: 600px)");
+    const update = () => setLandscape(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  const positionTableGroups = (groups: BoardGroup[], positions: TablePositions, movedId?: string) =>
+    arrangeTableGroups(groups, positions, stageSize, movedId);
   const [timer, setTimer] = useState(60);
   const [turnState, setTurnState] = useState<TurnState>("you");
   const [activeOpponent, setActiveOpponent] = useState<OpponentName>("Leo");
@@ -578,6 +535,8 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
   const [celebrating, setCelebrating] = useState(false);
 
   const selectedTiles = rack.filter((entry) => selectedIds.includes(entry.id));
+  const activeDragCount = activeTailIds.length
+    || (activeTile && selectedIds.includes(activeTile.id) ? selectedIds.length : 1);
   const turnValidation = useMemo(
     () => validateTurn(turnStart, board, rack),
     [turnStart, board, rack],
@@ -585,15 +544,20 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
   const boardHasIllegalDraft = board.some((group) => !analyzeMeld(group.tiles).valid);
   const boardIsEmpty = board.every((group) => group.tiles.length === 0);
   const visibleBoard = board.filter((group) => group.tiles.length > 0);
-  const lockedLayout = useMemo(
-    () => layoutLockedBoard(board, stageSize),
-    [board, stageSize],
-  );
   const layoutPositions = useMemo(
-    () => viewMode === "locked" ? lockedLayout.positions : positionTableGroups(board, groupPositions),
-    [viewMode, lockedLayout, board, groupPositions],
+    () => arrangeTableGroups(board, groupPositions, stageSize),
+    [board, groupPositions, stageSize],
   );
-  const rackColumns = Math.max(7, Math.ceil(rack.length / 2));
+  const rackCapacity = Math.max(7, Math.floor((stageSize.width - 42) / 38));
+  const rackColumns = Math.min(rackCapacity, Math.max(7, Math.ceil(rack.length / (landscape ? 1 : 2))));
+  const rackRows = Math.max(landscape ? 1 : 2, Math.ceil(rack.length / rackColumns));
+  const [rackSpace, setRackSpace] = useState({ portrait: 2, landscape: 1 });
+  const rackOrientation = landscape ? "landscape" : "portrait";
+  const visibleRackRows = Math.max(rackSpace[rackOrientation], Math.min(rackRows, landscape ? 2 : 3));
+  useEffect(() => {
+    setRackSpace((current) => current[rackOrientation] === visibleRackRows
+      ? current : { ...current, [rackOrientation]: visibleRackRows });
+  }, [rackOrientation, visibleRackRows]);
   const returnableTileIds = useMemo(
     () => new Set(turnStart.rack.map((entry) => entry.id)),
     [turnStart.rack],
@@ -620,7 +584,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
   };
 
   const handlePass = () => {
-    const base = cloneTurnSnapshot(turnStart);
+    const base = { ...cloneTurnSnapshot(turnStart), rack: withRackOrder(turnStart.rack, rack) };
     setRack(base.rack);
     setBoard(cloneBoard(base.board));
     setGroupPositions(clonePositions(turnStartPositions));
@@ -640,8 +604,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 130, tolerance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -684,7 +647,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
       return;
     }
 
-    const base = cloneTurnSnapshot(turnStart);
+    const base = { ...cloneTurnSnapshot(turnStart), rack: withRackOrder(turnStart.rack, rack) };
     const penaltyTiles = base.pool.slice(0, 1);
     const committed: TurnSnapshot = {
       ...base,
@@ -729,7 +692,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
         const nextPasses = consecutivePasses + 1;
         if (nextPasses >= 3) {
           endByStalemate({
-            You: rack,
+            You: rackRef.current,
             Maya: actingOpponent === "Maya" ? result.rack : opponentRacks.Maya,
             Leo: actingOpponent === "Leo" ? result.rack : opponentRacks.Leo,
           });
@@ -753,7 +716,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
       }
 
       const nextTurn: TurnSnapshot = {
-        rack: [...rack],
+        rack: [...rackRef.current],
         board: cloneBoard(result.board),
         pool: [...result.pool],
         hasOpened,
@@ -768,7 +731,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
       setSelectedIds([]);
     }, thinkingDelay);
     return () => window.clearTimeout(timeout);
-  }, [turnState, winner, activeOpponent, opponentRacks, opponentOpened, board, pool, turnNumber, rack, hasOpened, groupPositions, consecutivePasses]);
+  }, [turnState, winner, activeOpponent, opponentRacks, opponentOpened, board, pool, turnNumber, hasOpened, groupPositions, consecutivePasses]);
 
   useEffect(() => {
     if (!toast) return;
@@ -790,6 +753,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
   }, [timer, sfxOn, turnState, settingsOpen, winner]);
 
   const remember = () => {
+    setToast(null);
     setHistory((items) => [
       ...items,
       { rack: [...rack], board: cloneBoard(board), moveCount, positions: clonePositions(groupPositions) },
@@ -815,6 +779,12 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     }
     const splitId = `split-${turnNumber}-${moveCount + 1}-${movingTiles[0].id}`;
     const resolution = resolveTileDrop(board, groupId, movingTiles, targetIndex, splitId);
+    // A deliberate split may create incomplete halves; an unrelated rack tile
+    // should not damage an otherwise complete meld just because it was hit.
+    if (resolution.kind === "draft" && destination?.tiles.length && analyzeMeld(destination.tiles).valid) {
+      setToast("These tiles don’t fit that meld · place them on empty felt");
+      return;
+    }
     const candidateBoard = resolution.groups;
     remember();
     setRack((items) => items.filter((entry) => !movingIdSet.has(entry.id)));
@@ -909,7 +879,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     remember();
 
     if (movingTiles.length === source.tiles.length) {
-      setGroupPositions((current) => positionTableGroups(board, { ...current, [fromGroupId]: position }));
+      setGroupPositions((current) => positionTableGroups(board, { ...current, [fromGroupId]: position }, fromGroupId));
       return;
     }
 
@@ -963,32 +933,30 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     setSelectedIds([]);
   };
 
-  const getDropPosition = (active: DragEndEvent["active"]): TablePoint => {
+  const getDropPosition = ({ active, activatorEvent, delta }: DragEndEvent): TablePoint => {
     const boardElement = document.querySelector<HTMLElement>(".board-world");
     const tileRect = active.rect.current.translated ?? active.rect.current.initial;
     if (!boardElement || !tileRect) return { x: 50, y: 50 };
-    const boardRect = boardElement.getBoundingClientRect();
-    const centerX = tileRect.left + tileRect.width / 2;
-    const centerY = tileRect.top + tileRect.height / 2;
-    return {
-      x: Math.max(8, Math.min(92, ((centerX - boardRect.left) / boardRect.width) * 100)),
-      y: Math.max(10, Math.min(90, ((centerY - boardRect.top) / boardRect.height) * 100)),
-    };
+    const start = pointerPosition(activatorEvent);
+    const point = start ? { x: start.x + delta.x, y: start.y + delta.y }
+      : { x: tileRect.left + tileRect.width / 2, y: tileRect.top + tileRect.height / 2 };
+    return worldPoint(point, boardElement.getBoundingClientRect());
   };
 
-  const handleDragOver = ({ over }: DragOverEvent) => {
+  const handleDragOver = ({ over, active }: DragOverEvent) => {
     const overId = over ? String(over.id) : "";
-    if (overId.startsWith("group:")) {
-      setHoverGroupId(overId.slice(6));
-      return;
-    }
-    if (overId.startsWith("board-target:")) {
-      const targetTileId = overId.slice("board-target:".length);
-      const owner = board.find((group) => group.tiles.some((entry) => entry.id === targetTileId));
-      setHoverGroupId(owner?.id ?? null);
-      return;
-    }
-    setHoverGroupId(null);
+    const onBoard = overId === "board-drop" || overId.startsWith("group:") || overId.startsWith("board-target:");
+    const owner = overId.startsWith("group:") ? overId.slice(6)
+      : board.find((group) => group.tiles.some((entry) => `board-target:${entry.id}` === overId))?.id ?? null;
+    setHoverGroupId(owner);
+    const targetTileId = onBoard
+      ? over?.data.current?.tileId ?? board.find((group) => group.id === owner)?.tiles[0]?.id
+      : active.id;
+    const target = targetTileId
+      ? document.querySelector<HTMLElement>(`[data-tile-id="${window.CSS.escape(String(targetTileId))}"] .tile`)
+      : document.querySelector<HTMLElement>(".board-tile-measure");
+    const rect = target?.getBoundingClientRect();
+    if (rect) setOverlaySize({ width: rect.width, height: rect.height });
   };
 
   const handleDragCancel = () => {
@@ -998,16 +966,19 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
   };
 
   const handleDragStart = ({ active }: DragStartEvent) => {
+    const rect = document.querySelector<HTMLElement>(`[data-tile-id="${window.CSS.escape(String(active.id))}"] .tile`)?.getBoundingClientRect();
+    if (rect) setOverlaySize({ width: rect.width, height: rect.height });
     const dragged = active.data.current?.tile as Tile | undefined;
     setActiveTile(dragged ?? null);
     setActiveTailIds((active.data.current?.tailIds as string[] | undefined) ?? []);
   };
 
-  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
     setActiveTile(null);
     setActiveTailIds([]);
     setHoverGroupId(null);
-    if (!over || turnState !== "you") return;
+    if (!over) return;
     const activeId = String(active.id);
     const overId = String(over.id);
     const sourceType = active.data.current?.type as "rack-tile" | "board-tile" | undefined;
@@ -1018,6 +989,12 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     const draggedBoardIds = sourceType === "board-tile"
       ? ((active.data.current?.tailIds as string[] | undefined) ?? [activeId])
       : [];
+
+    if (sourceType === "rack-tile" && (overId === "rack-drop" || rack.some((entry) => entry.id === overId))) {
+      setRack((items) => moveRackSelection(items, draggedRackIds, overId === "rack-drop" ? undefined : overId));
+      return;
+    }
+    if (turnState !== "you") return;
 
     if (sourceType === "board-tile" && fromGroupId && rack.some((entry) => entry.id === overId)) {
       returnTilesToRack(draggedBoardIds, fromGroupId, rack.findIndex((entry) => entry.id === overId));
@@ -1049,17 +1026,13 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
       return;
     }
     if (overId === "board-drop") {
-      const position = getDropPosition(active);
+      const position = getDropPosition(event);
       if (sourceType === "board-tile" && fromGroupId) moveTableTilesToNewGroup(draggedBoardIds, fromGroupId, position);
       else placeTilesAsNewGroup(draggedRackIds, position);
       return;
     }
 
-    const oldIndex = rack.findIndex((entry) => entry.id === activeId);
-    const newIndex = rack.findIndex((entry) => entry.id === overId);
-    if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-      setRack((items) => arrayMove(items, oldIndex, newIndex));
-    }
+
   };
 
   const handleGroupTap = (groupId: string) => {
@@ -1086,7 +1059,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
 
   const handleDraw = () => {
     if (turnState !== "you" || winner) return;
-    const base = cloneTurnSnapshot(turnStart);
+    const base = { ...cloneTurnSnapshot(turnStart), rack: withRackOrder(turnStart.rack, rack) };
     const nextTile = base.pool[0];
     const committed: TurnSnapshot = {
       ...base,
@@ -1146,10 +1119,6 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
 
   const toggleViewMode = () => {
     const next = viewMode === "locked" ? "free" : "locked";
-    if (next === "free") {
-      setGroupPositions(clonePositions(lockedLayout.positions));
-      setBoardCamera(lockedLayout.camera);
-    }
     localStorage.setItem("tessera.viewMode", next);
     setViewMode(next);
   };
@@ -1178,12 +1147,14 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     setEndedByStalemate(false);
     setSelectedIds([]);
     setSettingsOpen(false);
+    setRackSpace({ portrait: 2, landscape: 1 });
     setToast(null);
   };
 
   return (
     <motion.main
       className="screen game-screen"
+      style={{ "--rack-rows": visibleRackRows } as CSSProperties}
       initial={{ opacity: 0, x: 36 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 36 }}
@@ -1211,7 +1182,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
         <BoardDropZone
           empty={boardIsEmpty}
           onTableTap={handleTableTap}
-          camera={viewMode === "locked" ? lockedLayout.camera : boardCamera}
+          camera={boardCamera}
           audioControls={
             <>
               <AudioToggle kind="music" on={musicOn} onChange={onMusicChange} />
@@ -1229,8 +1200,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
                 className="meld-position"
                 key={group.id}
                 initial={false}
-                animate={{ left: `${position.x}%`, top: `${position.y}%` }}
-                transition={{ type: "spring", stiffness: 260, damping: 28 }}
+                style={{ left: `${position.x}%`, top: `${position.y}%` }}
               >
                 <DroppableGroup
                   group={group}
@@ -1251,20 +1221,26 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
           {boardIsEmpty && (
             <div className="empty-table-copy" aria-hidden="true">
               <strong>Fresh table</strong>
-              <span>Tap to place · drag or pinch to explore</span>
+              <span>Tap or drag tiles onto the felt</span>
             </div>
           )}
           <AnimatePresence>{celebrating && <ConfettiBurst />}</AnimatePresence>
         </BoardDropZone>
 
         <RackDropZone
-          className={`rack-section ${rack.length > 14 ? "rack-section--compact" : ""} ${rack.length > 20 ? "rack-section--crowded" : ""}`}
-          label={`Your tile rack. All ${rack.length} tiles visible`}
+          className="rack-section"
+          label={`Your tile rack. ${rack.length} tiles. Tap to select; hold to select tiles to the right.`}
         >
+          <div className="rack-tools">
+            <span>{selectedTiles.length ? `${selectedTiles.length} selected` : "Tap or hold to select"}</span>
+            <button type="button" className="rack-clear" disabled={!selectedTiles.length || !!activeTile} onClick={() => setSelectedIds([])}>Clear</button>
+            <button type="button" disabled={!!activeTile} aria-label="Sort rack by runs of the same colour" title="Sort by colour, then number" onClick={() => { setRack(sortRackByRuns); setToast("Rack sorted by colour, then number"); }}><b>789</b><span>Runs</span></button>
+            <button type="button" disabled={!!activeTile} aria-label="Sort rack by equal numbers" title="Sort by number" onClick={() => { setRack(sortRackByGroups); setToast("Rack sorted by number"); }}><b>777</b><span>Groups</span></button>
+          </div>
           <div className="rack-shell">
             <div
               className="rack-grid"
-              style={{ "--rack-columns": rackColumns } as CSSProperties}
+              style={{ "--rack-columns": rackColumns, "--rack-total-rows": Math.max(rackRows, visibleRackRows) } as CSSProperties}
             >
               <SortableContext items={rack.map((entry) => entry.id)} strategy={rectSortingStrategy}>
                 {rack.map((entry) => (
@@ -1272,6 +1248,11 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
                     key={entry.id}
                     tile={entry}
                     selected={selectedIds.includes(entry.id)}
+                    lifted={!!activeTile && selectedIds.includes(activeTile.id) && selectedIds.includes(entry.id)}
+                    onExtend={(count) => {
+                      const start = rack.findIndex((tile) => tile.id === entry.id);
+                      setSelectedIds((current) => [...new Set([...current, ...rack.slice(start, start + count).map((tile) => tile.id)])]);
+                    }}
                     onSelect={() => setSelectedIds((current) => current.includes(entry.id)
                       ? current.filter((id) => id !== entry.id)
                       : [...current, entry.id])}
@@ -1299,13 +1280,13 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
           </p>
         </RackDropZone>
 
-        <DragOverlay dropAnimation={{ duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" }}>
+        <DragOverlay dropAnimation={null} modifiers={[centerDragOnPointer]}>
           {activeTile ? (
-            <div className="drag-stack">
+            <div className="drag-stack" style={{ width: overlaySize.width, height: overlaySize.height, "--drag-number-size": `${overlaySize.height * 0.46}px` } as CSSProperties}>
               <TileFace tile={activeTile} floating />
-              {(selectedIds.includes(activeTile.id) && selectedIds.length > 1) || activeTailIds.length > 1 ? (
-                <span aria-label={`${Math.max(selectedIds.length, activeTailIds.length)} tiles`}>
-                  {Math.max(selectedIds.length, activeTailIds.length)}
+              {activeDragCount > 1 ? (
+                <span aria-label={`${activeDragCount} tiles`}>
+                  {activeDragCount}
                 </span>
               ) : null}
             </div>
@@ -1522,7 +1503,7 @@ function BoardDropZone({
     if (viewMode === "locked") return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     const target = event.target as HTMLElement;
-    if (pointersRef.current.size === 0 && target.closest(".meld-position, .board-fit-button")) return;
+    if (pointersRef.current.size === 0 && target.closest(".meld-position, button")) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -1650,14 +1631,11 @@ function BoardDropZone({
           return;
         }
         const target = event.target as HTMLElement;
-        if (target.closest(".meld-position, .board-fit-button")) return;
+        if (target.closest(".meld-position, button")) return;
         const worldElement = event.currentTarget.querySelector<HTMLElement>(".board-world");
         const rect = worldElement?.getBoundingClientRect();
         if (!rect) return;
-        onTableTap({
-          x: Math.max(8, Math.min(92, ((event.clientX - rect.left) / rect.width) * 100)),
-          y: Math.max(10, Math.min(90, ((event.clientY - rect.top) / rect.height) * 100)),
-        });
+        onTableTap(worldPoint({ x: event.clientX, y: event.clientY }, rect));
       }}
     >
       <div className="board-audio">{audioControls}</div>
@@ -1666,10 +1644,10 @@ function BoardDropZone({
         className="board-world"
         style={{ x: cameraX, y: cameraY, scale: cameraZoom }}
       >
+        <div className="tile board-tile-measure" aria-hidden="true" />
         {world}
       </motion.div>
-      {viewMode === "free" && (
-        <button
+      <button
           className="board-fit-button"
           type="button"
           aria-label="Fit the whole table in view"
@@ -1684,11 +1662,10 @@ function BoardDropZone({
           </svg>
           <span>Fit</span>
         </button>
-      )}
       <button
         className="board-lock-button"
         type="button"
-        aria-label={viewMode === "locked" ? "Unlock the table view" : "Lock the table view"}
+        aria-label={viewMode === "locked" ? "Enable table panning and zooming" : "Lock the camera without rearranging tiles"}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => { event.stopPropagation(); onToggleViewMode(); }}
       >
@@ -1697,7 +1674,7 @@ function BoardDropZone({
             ? <path d="M6 9V6a4 4 0 1 1 8 0v3M5 9h10v7H5z" />
             : <path d="M6 9V6a4 4 0 0 1 7.6-1.6M5 9h10v7H5z" />}
         </svg>
-        <span>{viewMode === "locked" ? "Locked" : "Free"}</span>
+        <span>{viewMode === "locked" ? "Pan off" : "Pan on"}</span>
       </button>
     </section>
   );
