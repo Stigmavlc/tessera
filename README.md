@@ -17,11 +17,11 @@ npm run dev
 
 Then open the local URL printed by Vite (the dev server binds all interfaces, so a phone on the same Wi-Fi can use the network URL).
 
-## Physical tiles preview
+## Physical tiles and rack
 
-Add `?tiles=realistic` to the URL to try a textured terracotta rack with supporting ledges, ivory tile faces, moulded edges, and recessed-looking numbers. This appearance experiment is opt-in; removing the parameter restores the usual finish. It can be combined with a player name: `?name=Mara&tiles=realistic`.
+The textured terracotta rack with supporting ledges, ivory tile faces, moulded edges, and recessed-looking numbers is the default appearance. Existing links, including `?name=Mara`, show it automatically; no preview parameter is needed.
 
-The shelf construction is inspired by [physical Rummikub rack reference photos](https://www.toysrus.co.za/rummikub-classic). The preview uses CSS surfaces and keeps the game’s existing tile hit areas and rules.
+The shelf construction is inspired by [physical Rummikub rack reference photos](https://www.toysrus.co.za/rummikub-classic). The finish uses CSS surfaces and keeps the game’s existing tile hit areas and rules.
 
 ## Included interactions
 

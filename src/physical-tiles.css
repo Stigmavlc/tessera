@@ -1,4 +1,4 @@
-/* Appearance preview: ?tiles=realistic. Keep the hit areas and table geometry
+/* Default physical finish. Keep the hit areas and table geometry
    intact; depth is painted with shading rather than perspective transforms. */
 .app-stage--physical .tile {
   border: 1px solid #c6c0ae;

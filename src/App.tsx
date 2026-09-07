@@ -76,8 +76,6 @@ const clonePositions = (positions: TablePositions): TablePositions => Object.fro
 // UI shows it. Engine state keeps the internal "You" key — display only.
 const localPlayerName = (new URLSearchParams(window.location.search).get("name")?.trim() || "You").slice(0, 12);
 const localPlayerInitial = localPlayerName.charAt(0).toUpperCase();
-// Opt-in appearance experiment; the normal link keeps the existing finish.
-const physicalTilesPreview = new URLSearchParams(window.location.search).get("tiles") === "realistic";
 
 const defaultCamera: BoardCamera = { x: 0, y: 6, zoom: 0.58 };
 const sealDraftSlot = (groups: BoardGroup[], id: string): BoardGroup[] => {
@@ -1268,11 +1266,9 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
               className="rack-grid"
               style={{ "--rack-columns": rackColumns, "--rack-total-rows": Math.max(rackRows, visibleRackRows) } as CSSProperties}
             >
-              {physicalTilesPreview && (
-                <div className="rack-shelves" aria-hidden="true">
-                  {Array.from({ length: Math.max(rackRows, visibleRackRows) }, (_, row) => <div className="rack-shelf" key={row} />)}
-                </div>
-              )}
+              <div className="rack-shelves" aria-hidden="true">
+                {Array.from({ length: Math.max(rackRows, visibleRackRows) }, (_, row) => <div className="rack-shelf" key={row} />)}
+              </div>
               <SortableContext items={rack.map((entry) => entry.id)} strategy={rectSortingStrategy}>
                 {rack.map((entry) => (
                   <SortableTile
@@ -1800,7 +1796,7 @@ function App() {
   }, [screen, musicOn]);
 
   return (
-    <div className={`app-stage${physicalTilesPreview ? " app-stage--physical" : ""}`}>
+    <div className="app-stage app-stage--physical">
       <div className="sun-disc" aria-hidden="true" />
       <div className="plate-motif" aria-hidden="true"><span /></div>
       <div className="phone-shell">
