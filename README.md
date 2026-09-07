@@ -30,6 +30,7 @@ The shelf construction is inspired by [physical Rummikub rack reference photos](
 - Collision-aware meld placement that keeps player and AI groups from visually overlapping
 - Larger virtual tabletop; switch to the free camera for one-finger/mouse-drag panning, pinch/wheel zoom, and Fit recovery
 - Tap to select rack tiles, or hold a tile to progressively select tiles to its right; drag the batch as one move
+- Compatible melds show insertion previews and generous end targets; nearby drops along the same row attach automatically, while empty space below remains available for separate groups
 - Precise pointer-based drop targets, with a drag preview that matches the tile size on the board
 - Incompatible rack additions leave complete melds intact; incomplete drafts and deliberate run splits remain supported
 - Drop a duplicate tile mid-run to split it into two melds, exactly like the boxed rules
@@ -50,7 +51,8 @@ The shelf construction is inspired by [physical Rummikub rack reference photos](
 - One-minute timer that auto-submits legal play, restores the table and draws one on an unfinished draft, or draws one when idle
 - Pool-empty endgame: End Turn becomes Pass, three consecutive passes end the round by stalemate, and the lowest rack total wins on differential scoring
 - Legal local turns and separate 30-point openings for Leo and Maya
-- Non-blocking opponent turns that leave the entire table visible
+- Opponents lift and drag tiles face down from their seat, revealing the number only when each tile lands; additions stay highlighted through your next turn, and drawn tiles remain face down
+- A blue Your turn band beside the rack and matching header make the active turn obvious; the full player minute starts after opponent animations finish
 - One quiet inline game-status line instead of bottom-screen notification overlays
 - High-contrast tile colours reinforced with distinct geometric markers
 - Plain textured felt with a subtle embossed Tessera mark, without dot patterns or corner guides
@@ -66,3 +68,10 @@ The shelf construction is inspired by [physical Rummikub rack reference photos](
 npm test
 npm run build
 ```
+
+
+## Project notes
+
+- [Project master and changelog](Project_Master_and_changelog.md) — current decisions, completed work, release history, and remaining playtest items.
+- [Architecture and development guidance](CLAUDE.md) — state, placement, gesture, and rendering invariants.
+- [Interaction regression checks](docs/interaction-checks.md) — verification scenarios and the latest tested coverage.

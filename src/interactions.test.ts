@@ -4,7 +4,7 @@ import { tile } from "./game";
 import { moveRackSelection, tabletopCollision, withRackOrder, worldPoint } from "./interactions";
 
 const rectangle = (left: number, top: number, width: number, height: number) => ({ left, top, width, height, right: left + width, bottom: top + height });
-const collisionAt = (point: { x: number; y: number } | null) => tabletopCollision({
+const collisionAt = (point: { x: number; y: number } | null, canAccept = false) => tabletopCollision({
   pointerCoordinates: point,
   collisionRect: rectangle(80, 135, 52, 70),
   droppableRects: new Map([
@@ -12,10 +12,15 @@ const collisionAt = (point: { x: number; y: number } | null) => tabletopCollisio
     ["group:nines", rectangle(60, 100, 100, 45)],
     ["board-target:nine", rectangle(85, 105, 28, 36)],
   ]),
-  droppableContainers: [{ id: "board-drop" }, { id: "group:nines" }, { id: "board-target:nine" }],
+  droppableContainers: [{ id: "board-drop" }, { id: "group:nines", data: { current: { canAccept } } }, { id: "board-target:nine" }],
 } as unknown as Parameters<CollisionDetection>[0]);
 
 describe("precise table drops", () => {
+  it("accepts a compatible approach 35 px beside the group but not an incompatible one", () => {
+    expect(collisionAt({ x: 195, y: 120 }, true)[0].id).toBe("group:nines");
+    expect(collisionAt({ x: 195, y: 120 }, false)[0].id).toBe("board-drop");
+    expect(collisionAt({ x: 100, y: 165 }, true)[0].id).toBe("board-drop");
+  });
   it("keeps empty felt below a meld independent even when the large dragged rectangle overlaps it", () => {
     expect(collisionAt({ x: 100, y: 160 }).map((hit) => hit.id)).toEqual(["board-drop"]);
   });

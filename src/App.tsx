@@ -23,6 +23,7 @@ import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion"
 import {
   BoardGroup,
   Deal,
+  MeldSide,
   OpponentName,
   OpponentRacks,
   PlayerName,
@@ -30,6 +31,7 @@ import {
   TurnSnapshot,
   analyzeMeld,
   createDeal,
+  extendMeldAtEnd,
   initialBoard,
   moveBoardTiles,
   orderMeldTiles,
@@ -42,6 +44,7 @@ import {
   sortRackByRuns,
   validateTurn,
 } from "./game";
+import { opponentPlayFrames } from "./opponent-presentation";
 import { playTick, playTilePlace, setMusic } from "./audio";
 import { BoardCamera, TablePoint, TablePositions, positionTableGroups as arrangeTableGroups } from "./layout";
 import { centerDragOnPointer, moveRackSelection, pointerPosition, tabletopCollision, withRackOrder, worldPoint } from "./interactions";
@@ -49,6 +52,8 @@ import { centerDragOnPointer, moveRackSelection, pointerPosition, tabletopCollis
 type Screen = "home" | "game";
 type TurnState = "you" | "opponent";
 type Winner = "You" | OpponentName;
+type OpponentFlight = { key: string; kind: "play" | "draw"; from: TablePoint; to: TablePoint; width: number; height: number };
+const opponentDragDuration = 900;
 
 type ActionSnapshot = {
   rack: Tile[];
@@ -279,6 +284,48 @@ function DraggableBoardTile({
   );
 }
 
+function OpponentTileFlight({ flight }: { flight: OpponentFlight }) {
+  const from = { x: flight.from.x - flight.width / 2, y: flight.from.y - flight.height / 2 };
+  const to = { x: flight.to.x - flight.width / 2, y: flight.to.y - flight.height / 2 };
+  const playing = flight.kind === "play";
+  return (
+    <motion.div className={`opponent-flight opponent-flight--${flight.kind}`} aria-hidden="true"
+      style={{ width: flight.width, height: flight.height }}
+      initial={{ x: from.x, y: from.y, opacity: .6, scale: .8 }}
+      animate={playing ? {
+        x: [from.x, from.x + 6, (from.x + to.x) / 2, to.x, to.x],
+        y: [from.y, from.y - 16, (from.y + to.y) / 2 - 20, to.y - 8, to.y],
+        scale: [.8, 1.1, 1.1, 1.06, 1], rotate: [-5, -5, 3, 0, 0], opacity: 1,
+      } : { x: to.x, y: to.y, opacity: 1, scale: 1 }}
+      transition={playing
+        ? { duration: opponentDragDuration / 1000, times: [0, .22, .58, .84, 1], ease: "easeInOut" }
+        : { duration: .42, ease: [.2, .7, .2, 1] }}>
+      <div className="tile tile--back">◆</div>
+    </motion.div>
+  );
+}
+
+function MeldEndTarget({ group, side, moving, onTap }: {
+  group: BoardGroup; side: MeldSide; moving: Tile[]; onTap: (groupId: string, side: MeldSide) => void;
+}) {
+  const preview = extendMeldAtEnd(group, moving, side);
+  const { setNodeRef, isOver } = useDroppable({
+    id: `meld-end:${side}:${group.id}`,
+    disabled: !preview,
+    data: { type: "meld-end", groupId: group.id, side },
+  });
+  return (
+    <button ref={setNodeRef} type="button"
+      className={`meld-end meld-end--${side} ${preview ? "meld-end--ready" : ""} ${isOver ? "meld-end--over" : ""}`}
+      disabled={!preview} tabIndex={preview ? 0 : -1}
+      aria-label={`Add selected tiles to the ${side} of this meld`}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => { event.stopPropagation(); onTap(group.id, side); }}>
+      {preview && <span className={`meld-end__preview tile--${moving[0].color}`}><b>{moving.length === 1 ? moving[0].value : `+${moving.length}`}</b><small>{side === "left" ? "→" : "←"}</small></span>}
+    </button>
+  );
+}
+
 function DroppableGroup({
   group,
   activeTile,
@@ -288,6 +335,11 @@ function DroppableGroup({
   onTap,
   returnableTileIds,
   onReturnTile,
+  incomingTiles,
+  onEndTap,
+  opponentTurn,
+  recentIds,
+  flyingId,
 }: {
   group: BoardGroup;
   activeTile: Tile | null;
@@ -297,10 +349,15 @@ function DroppableGroup({
   onTap: (groupId: string) => void;
   returnableTileIds: Set<string>;
   onReturnTile: (tileId: string, groupId: string) => void;
+  incomingTiles: Tile[];
+  onEndTap: (groupId: string, side: MeldSide) => void;
+  opponentTurn: boolean;
+  recentIds: string[];
+  flyingId: string | null;
 }) {
   const { isOver, setNodeRef } = useDroppable({
     id: `group:${group.id}`,
-    data: { type: "board-group", groupId: group.id },
+    data: { type: "board-group", groupId: group.id, canAccept: !!(extendMeldAtEnd(group, incomingTiles, "left") || extendMeldAtEnd(group, incomingTiles, "right")) },
   });
 
   const canReceive = activeTile !== null || selectedTiles.length > 0;
@@ -318,7 +375,7 @@ function DroppableGroup({
   return (
     <div
       ref={setNodeRef}
-      className={`meld meld--${group.id} meld--kind-${group.kind} meld--table-added ${isFourTileSet ? "meld--four-set" : ""} ${lengthClass} ${isOver ? "meld--over" : ""} ${hot ? "meld--hot" : ""} ${canReceive ? "meld--receivable" : ""} ${isDraftInvalid ? "meld--invalid" : ""}`}
+      className={`meld meld--${group.id} meld--kind-${group.kind} meld--table-added ${isFourTileSet ? "meld--four-set" : ""} ${lengthClass} ${isOver ? "meld--over" : ""} ${hot ? "meld--hot" : ""} ${canReceive ? "meld--receivable" : ""} ${isDraftInvalid && !opponentTurn ? "meld--invalid" : ""} ${opponentTurn ? "meld--opponent" : ""}`}
       onClick={(event) => {
         event.stopPropagation();
         onTap(group.id);
@@ -326,27 +383,34 @@ function DroppableGroup({
       role="button"
       tabIndex={0}
       onKeyDown={(event) => {
-        if (canReceive && (event.key === "Enter" || event.key === " ")) onTap(group.id);
+        if (event.target === event.currentTarget && canReceive && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onTap(group.id); }
       }}
       aria-label={group.tiles.length ? `${groupLabel}, ${group.tiles.length} tiles` : groupLabel}
     >
+      <MeldEndTarget group={group} side="left" moving={incomingTiles} onTap={onEndTap} />
+      <MeldEndTarget group={group} side="right" moving={incomingTiles} onTap={onEndTap} />
       <AnimatePresence initial={false}>
         {group.tiles.map((entry, index) => (
           <motion.div
             key={entry.id}
+            className={`${recentIds.includes(entry.id) ? "opponent-tile-added" : ""} ${flyingId === entry.id ? "opponent-tile-in-flight" : ""}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.09 }}
           >
-            <DraggableBoardTile
+            {flyingId === entry.id ? (
+              <div className="board-tile-wrap" aria-hidden="true">
+                <div className="board-tile" data-tile-id={entry.id}><div className="tile" /></div>
+              </div>
+            ) : <DraggableBoardTile
               tile={entry}
               groupId={group.id}
               tailIds={isValidRun ? group.tiles.slice(index).map((tail) => tail.id) : [entry.id]}
               returnable={returnableTileIds.has(entry.id)}
               lifted={activeTailIds.includes(entry.id) && activeTile?.id !== entry.id}
               onReturn={() => onReturnTile(entry.id, group.id)}
-            />
+            />}
           </motion.div>
         ))}
       </AnimatePresence>
@@ -533,8 +597,29 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
   const [toast, setToast] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [celebrating, setCelebrating] = useState(false);
+  const [opponentActivity, setOpponentActivity] = useState<string | null>(null);
+  const [opponentSummary, setOpponentSummary] = useState<string[]>([]);
+  const [recentOpponentIds, setRecentOpponentIds] = useState<string[]>([]);
+  const [flyingId, setFlyingId] = useState<string | null>(null);
+  const [opponentFlight, setOpponentFlight] = useState<OpponentFlight | null>(null);
+  const stageSizeRef = useRef(stageSize);
+  stageSizeRef.current = stageSize;
+  const sfxRef = useRef(sfxOn);
+  sfxRef.current = sfxOn;
+  useEffect(() => {
+    if (turnState === "opponent") {
+      setRecentOpponentIds([]);
+      setOpponentSummary([]);
+      setToast(null);
+    }
+  }, [turnState]);
 
   const selectedTiles = rack.filter((entry) => selectedIds.includes(entry.id));
+  const incomingTiles = activeTile
+    ? rack.some((tile) => tile.id === activeTile.id)
+      ? selectedIds.includes(activeTile.id) ? selectedTiles : [activeTile]
+      : board.flatMap((group) => group.tiles).filter((tile) => (activeTailIds.length ? activeTailIds : [activeTile.id]).includes(tile.id))
+    : selectedTiles;
   const activeDragCount = activeTailIds.length
     || (activeTile && selectedIds.includes(activeTile.id) ? selectedIds.length : 1);
   const turnValidation = useMemo(
@@ -670,58 +755,91 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
   useEffect(() => {
     if (turnState !== "opponent" || winner) return;
     const actingOpponent = activeOpponent;
-    // Each opponent "thinks" for a random 3-10 seconds so their turns feel
-    // like a real player deliberating rather than an instant machine.
-    const thinkingDelay = 3000 + Math.random() * 7000;
-    const timeout = window.setTimeout(() => {
+    let cancelled = false;
+    const waiting = new Map<number, (ready: boolean) => void>();
+    const wait = (ms: number) => new Promise<boolean>((resolve) => {
+      const id = window.setTimeout(() => { waiting.delete(id); resolve(!cancelled); }, ms);
+      waiting.set(id, resolve);
+    });
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const centre = (selector: string): TablePoint => {
+      const rect = document.querySelector(selector)?.getBoundingClientRect();
+      return rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: 0, y: 0 };
+    };
+    const performTurn = async () => {
+      setOpponentActivity(`${actingOpponent} is thinking · arrange your rack`);
+      if (!await wait(3000 + Math.random() * 7000)) return;
       const result = playOpponentTurn({
-        name: actingOpponent,
-        rack: opponentRacks[actingOpponent],
-        board,
-        pool,
-        turnKey: `${turnNumber}-${actingOpponent}`,
-        hasOpened: opponentOpened[actingOpponent],
+        name: actingOpponent, rack: opponentRacks[actingOpponent], board, pool,
+        turnKey: `${turnNumber}-${actingOpponent}`, hasOpened: opponentOpened[actingOpponent],
       });
-
-      const nextPositions = positionTableGroups(result.board, groupPositions);
+      const nextPositions = arrangeTableGroups(result.board, groupPositions, stageSizeRef.current);
+      const frames = opponentPlayFrames(board, result.board, result.playedTileIds);
+      const revealed = new Set<string>();
+      for (const [index, frame] of frames.entries()) {
+        setOpponentActivity(`${actingOpponent} picks up tile ${index + 1} of ${frames.length}`);
+        setFlyingId(reducedMotion ? null : frame.tile.id);
+        setBoard(cloneBoard(frame.board));
+        setGroupPositions(nextPositions);
+        // Lay out an invisible, blank destination. The tile face is not mounted
+        // until the face-down pickup/drag/drop has finished.
+        if (!await wait(40)) return;
+        const rect = document.querySelector(`[data-tile-id="${window.CSS.escape(frame.tile.id)}"] .tile`)?.getBoundingClientRect();
+        if (!reducedMotion && rect) {
+          setOpponentFlight({ key: frame.tile.id, kind: "play",
+            from: centre(`[data-player="${actingOpponent}"] .avatar`),
+            to: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
+            width: rect.width, height: rect.height,
+          });
+          if (!await wait(200)) return;
+          setOpponentActivity(`${actingOpponent} is moving tile ${index + 1} of ${frames.length}`);
+          if (!await wait(opponentDragDuration - 200 + 40)) return;
+        }
+        setOpponentFlight(null);
+        setFlyingId(null);
+        setOpponentActivity(`${actingOpponent} placed tile ${index + 1} of ${frames.length}`);
+        revealed.add(frame.tile.id);
+        setRecentOpponentIds((current) => [...current, frame.tile.id]);
+        setOpponentRacks((current) => ({ ...current, [actingOpponent]: opponentRacks[actingOpponent].filter((tile) => !revealed.has(tile.id)) }));
+        if (sfxRef.current) playTilePlace();
+        if (!await wait(reducedMotion ? 280 : 180)) return;
+      }
+      if (result.action === "draw") {
+        setOpponentActivity(`${actingOpponent} draws one tile`);
+        if (!reducedMotion) setOpponentFlight({
+          key: `draw-${actingOpponent}-${turnNumber}`, kind: "draw",
+          from: centre(".table-brand .brand-mark"), to: centre(`[data-player="${actingOpponent}"] .avatar`),
+          width: 28, height: 38,
+        });
+        if (!await wait(reducedMotion ? 300 : 460)) return;
+        setOpponentFlight(null);
+      }
       setBoard(cloneBoard(result.board));
       setGroupPositions(nextPositions);
       setPool([...result.pool]);
       setOpponentRacks((current) => ({ ...current, [actingOpponent]: [...result.rack] }));
+      setOpponentActivity(result.message);
+      setOpponentSummary((current) => [...current, result.action === "play"
+        ? `${actingOpponent} +${result.playedTileIds.length}`
+        : result.action === "draw" ? `${actingOpponent} drew 1` : `${actingOpponent} passed`]);
+      // Let the last placement and action summary settle before changing seats.
+      if (!await wait(850)) return;
       if (result.action === "stuck") {
         const nextPasses = consecutivePasses + 1;
         if (nextPasses >= 3) {
-          endByStalemate({
-            You: rackRef.current,
+          endByStalemate({ You: rackRef.current,
             Maya: actingOpponent === "Maya" ? result.rack : opponentRacks.Maya,
             Leo: actingOpponent === "Leo" ? result.rack : opponentRacks.Leo,
           });
           return;
         }
         setConsecutivePasses(nextPasses);
-      } else {
-        setConsecutivePasses(0);
-      }
-      if (result.opensPlayer) {
-        setOpponentOpened((current) => ({ ...current, [actingOpponent]: true }));
-      }
-      if (result.winsGame) {
-        setWinner(actingOpponent);
-        return;
-      }
-
-      if (actingOpponent === "Leo") {
-        setActiveOpponent("Maya");
-        return;
-      }
-
-      const nextTurn: TurnSnapshot = {
-        rack: [...rackRef.current],
-        board: cloneBoard(result.board),
-        pool: [...result.pool],
-        hasOpened,
-      };
-      setTurnStart(nextTurn);
+      } else setConsecutivePasses(0);
+      if (result.opensPlayer) setOpponentOpened((current) => ({ ...current, [actingOpponent]: true }));
+      if (result.winsGame) { setWinner(actingOpponent); return; }
+      setOpponentActivity(null);
+      if (actingOpponent === "Leo") { setActiveOpponent("Maya"); return; }
+      setTurnStart({ rack: [...rackRef.current], board: cloneBoard(result.board), pool: [...result.pool], hasOpened });
       setTurnStartPositions(clonePositions(nextPositions));
       setTurnNumber((value) => value + 1);
       setTurnState("you");
@@ -729,9 +847,16 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
       setHistory([]);
       setMoveCount(0);
       setSelectedIds([]);
-    }, thinkingDelay);
-    return () => window.clearTimeout(timeout);
-  }, [turnState, winner, activeOpponent, opponentRacks, opponentOpened, board, pool, turnNumber, hasOpened, groupPositions, consecutivePasses]);
+    };
+    void performTurn();
+    return () => {
+      cancelled = true;
+      for (const [id, resolve] of waiting) { window.clearTimeout(id); resolve(false); }
+      waiting.clear();
+    };
+    // One cancellable sequence per opponent. Its own board/count updates and
+    // the player's rack sorting must not restart the presentation or AI turn.
+  }, [turnState, activeOpponent, winner, deal]);
 
   useEffect(() => {
     if (!toast) return;
@@ -760,7 +885,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     ]);
   };
 
-  const placeTiles = (tileIds: string[], groupId: string, targetIndex?: number) => {
+  const placeTiles = (tileIds: string[], groupId: string, targetIndex?: number, side?: MeldSide) => {
     if (turnState !== "you") return;
     const movingIdSet = new Set(tileIds);
     const movingTiles = rack.filter((entry) => movingIdSet.has(entry.id));
@@ -778,7 +903,11 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
       return;
     }
     const splitId = `split-${turnNumber}-${moveCount + 1}-${movingTiles[0].id}`;
-    const resolution = resolveTileDrop(board, groupId, movingTiles, targetIndex, splitId);
+    const endTiles = side && destination ? extendMeldAtEnd(destination, movingTiles, side) : null;
+    if (side && !endTiles) return;
+    const resolution = endTiles
+      ? { kind: "extend" as const, groups: board.map((group) => group.id === groupId ? { ...group, tiles: endTiles } : group) }
+      : resolveTileDrop(board, groupId, movingTiles, targetIndex, splitId);
     // A deliberate split may create incomplete halves; an unrelated rack tile
     // should not damage an otherwise complete meld just because it was hit.
     if (resolution.kind === "draft" && destination?.tiles.length && analyzeMeld(destination.tiles).valid) {
@@ -828,10 +957,27 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     fromGroupId: string,
     toGroupId: string,
     targetIndex?: number,
+    side?: MeldSide,
   ) => {
     if (turnState !== "you" || (fromGroupId === toGroupId && targetIndex === undefined)) return;
     if (!hasOpened && tileIds.some((id) => !returnableTileIds.has(id))) {
       setToast("Table rearrangement unlocks after your 30-point opening meld");
+      return;
+    }
+    if (side) {
+      if (fromGroupId === toGroupId) return;
+      const target = board.find((group) => group.id === toGroupId);
+      const moving = board.find((group) => group.id === fromGroupId)?.tiles.filter((tile) => tileIds.includes(tile.id)) ?? [];
+      const endTiles = target && extendMeldAtEnd(target, moving, side);
+      if (!endTiles) return;
+      remember();
+      const nextBoard = board.map((group) => group.id === fromGroupId
+        ? { ...group, tiles: group.tiles.filter((tile) => !tileIds.includes(tile.id)) }
+        : group.id === toGroupId ? { ...group, tiles: endTiles } : group)
+        .filter((group) => group.id === "new-meld" || group.tiles.length);
+      setBoard(nextBoard);
+      setGroupPositions((current) => positionTableGroups(nextBoard, current));
+      setMoveCount((value) => value + 1);
       return;
     }
     if (fromGroupId === toGroupId || tileIds.length > 1) {
@@ -945,9 +1091,9 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
 
   const handleDragOver = ({ over, active }: DragOverEvent) => {
     const overId = over ? String(over.id) : "";
-    const onBoard = overId === "board-drop" || overId.startsWith("group:") || overId.startsWith("board-target:");
-    const owner = overId.startsWith("group:") ? overId.slice(6)
-      : board.find((group) => group.tiles.some((entry) => `board-target:${entry.id}` === overId))?.id ?? null;
+    const onBoard = overId === "board-drop" || overId.startsWith("group:") || overId.startsWith("board-target:") || overId.startsWith("meld-end:");
+    const owner = over?.data.current?.groupId ?? (overId.startsWith("group:") ? overId.slice(6)
+      : board.find((group) => group.tiles.some((entry) => `board-target:${entry.id}` === overId))?.id ?? null);
     setHoverGroupId(owner);
     const targetTileId = onBoard
       ? over?.data.current?.tileId ?? board.find((group) => group.id === owner)?.tiles[0]?.id
@@ -1006,6 +1152,12 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
       return;
     }
 
+    if (over.data.current?.type === "meld-end") {
+      const { groupId, side } = over.data.current as { groupId: string; side: MeldSide };
+      if (sourceType === "board-tile" && fromGroupId) rearrangeTableTiles(draggedBoardIds, fromGroupId, groupId, undefined, side);
+      else placeTiles(draggedRackIds, groupId, undefined, side);
+      return;
+    }
     if (overId.startsWith("board-target:")) {
       const targetTileId = overId.slice("board-target:".length);
       const targetGroup = board.find((group) => group.tiles.some((entry) => entry.id === targetTileId));
@@ -1165,13 +1317,18 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     setSelectedIds([]);
     setSettingsOpen(false);
     setRackSpace({ portrait: 2, landscape: 1 });
+    setOpponentActivity(null);
+    setOpponentSummary([]);
+    setRecentOpponentIds([]);
+    setFlyingId(null);
+    setOpponentFlight(null);
     setToast(null);
   };
 
   return (
     <motion.main
-      className="screen game-screen"
-      style={{ "--rack-rows": visibleRackRows } as CSSProperties}
+      className={`screen game-screen ${turnState === "you" && !winner ? "game-screen--your-turn" : "game-screen--opponent-turn"}`}
+      style={{ "--rack-rows": visibleRackRows, "--board-zoom": boardCamera.zoom } as CSSProperties}
       initial={{ opacity: 0, x: 36 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 36 }}
@@ -1191,8 +1348,8 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
 
       <section className="player-rail" aria-label="Players">
         <div className={`rail-player ${turnState === "you" ? "rail-player--active" : ""}`}><Avatar initials={localPlayerInitial} tone="olive" active={turnState === "you"} /><span><strong>{localPlayerName}</strong><em>{rack.length} tiles</em></span></div>
-        <div className={`rail-player ${turnState === "opponent" && activeOpponent === "Leo" ? "rail-player--active" : ""}`}><Avatar initials="L" tone="blue" active={turnState === "opponent" && activeOpponent === "Leo"} /><span><strong>Leo</strong><em>{opponentRacks.Leo.length} tiles</em></span></div>
-        <div className={`rail-player ${turnState === "opponent" && activeOpponent === "Maya" ? "rail-player--active" : ""}`}><Avatar initials="M" tone="terra" active={turnState === "opponent" && activeOpponent === "Maya"} /><span><strong>Maya</strong><em>{opponentRacks.Maya.length} tiles</em></span></div>
+        <div data-player="Leo" className={`rail-player ${turnState === "opponent" && activeOpponent === "Leo" ? "rail-player--active" : ""}`}><Avatar initials="L" tone="blue" active={turnState === "opponent" && activeOpponent === "Leo"} /><span><strong>Leo</strong><em>{opponentRacks.Leo.length} tiles</em></span></div>
+        <div data-player="Maya" className={`rail-player ${turnState === "opponent" && activeOpponent === "Maya" ? "rail-player--active" : ""}`}><Avatar initials="M" tone="terra" active={turnState === "opponent" && activeOpponent === "Maya"} /><span><strong>Maya</strong><em>{opponentRacks.Maya.length} tiles</em></span></div>
       </section>
 
       <DndContext sensors={sensors} collisionDetection={tabletopCollision} onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
@@ -1221,6 +1378,11 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
               >
                 <DroppableGroup
                   group={group}
+                  incomingTiles={turnState === "you" && !winner && (hasOpened || group.tiles.every((tile) => returnableTileIds.has(tile.id))) ? incomingTiles : []}
+                  onEndTap={(groupId, side) => placeTiles(selectedIds, groupId, undefined, side)}
+                  opponentTurn={turnState === "opponent"}
+                  recentIds={recentOpponentIds}
+                  flyingId={flyingId}
                   activeTile={activeTile}
                   activeTailIds={activeTailIds}
                   hot={hoverGroupId === group.id}
@@ -1255,6 +1417,11 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
           className="rack-section"
           label={`Your tile rack. ${rack.length} tiles. Tap to select; hold to select tiles to the right.`}
         >
+          <div className="turn-banner" role="status" aria-live="polite">
+            <strong>{turnState === "you" ? "Your turn" : `${activeOpponent}’s turn`}</strong>
+            <span>{turnState === "you" ? opponentSummary.join(" · ") || "Choose your tiles" : opponentActivity || "Thinking…"}</span>
+            {turnState === "you" && <b aria-hidden="true">{Math.floor(timer / 60)}:{String(timer % 60).padStart(2, "0")}</b>}
+          </div>
           <div className="rack-tools">
             <span>{selectedTiles.length ? `${selectedTiles.length} selected` : "Tap or hold to select"}</span>
             <button type="button" className="rack-clear" disabled={!selectedTiles.length || !!activeTile} onClick={() => setSelectedIds([])}>Clear</button>
@@ -1293,7 +1460,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
             {toast
               ? toast
               : turnState === "opponent"
-                ? `${activeOpponent} is arranging · plan your next move`
+                ? opponentActivity || `${activeOpponent} is thinking · arrange your rack`
                 : selectedTiles.length > 0
                   ? `${selectedTiles.length} selected · tap the felt or a meld`
                   : boardHasIllegalDraft
@@ -1339,6 +1506,8 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
           <span className="turn-action__arrow" aria-hidden="true">→</span>
         </motion.button>
       </section>
+
+      {opponentFlight && <OpponentTileFlight key={opponentFlight.key} flight={opponentFlight} />}
 
       <AnimatePresence>
         {winner && finalScores && (

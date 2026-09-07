@@ -5,17 +5,30 @@ import type { TablePoint } from "./layout";
 const priority = (id: string | number) => {
   const value = String(id);
   if (value.startsWith("board-target:")) return 0;
-  if (value.startsWith("group:")) return 1;
-  if (value === "board-drop") return 4;
-  if (value === "rack-drop") return 3;
-  return 2;
+  if (value.startsWith("meld-end:")) return 1;
+  if (value.startsWith("group:")) return 2;
+  if (value === "board-drop") return 5;
+  if (value === "rack-drop") return 4;
+  return 3;
 };
 
-// Only an actual pointer hit may join a meld. Empty felt and off-table drops
-// must never be stolen by the large rack tile's bounding rectangle.
-export const tabletopCollision: CollisionDetection = (args) => args.pointerCoordinates
-  ? pointerWithin(args).sort((a, b) => priority(a.id) - priority(b.id))
-  : closestCenter(args);
+// A generous horizontal approach lane belongs only to a compatible meld.
+// Keep the vertical tolerance narrow so a new group below stays independent.
+export const tabletopCollision: CollisionDetection = (args) => {
+  if (!args.pointerCoordinates) return closestCenter(args);
+  const hits = pointerWithin(args).sort((a, b) => priority(a.id) - priority(b.id));
+  if (hits[0]?.id !== "board-drop") return hits;
+  const pointer = args.pointerCoordinates;
+  const nearby = args.droppableContainers.flatMap((container) => {
+    if (!String(container.id).startsWith("group:") || !container.data?.current?.canAccept) return [];
+    const rect = args.droppableRects.get(container.id);
+    if (!rect) return [];
+    const dx = Math.max(rect.left - pointer.x, pointer.x - rect.right, 0);
+    const dy = Math.max(rect.top - pointer.y, pointer.y - rect.bottom, 0);
+    return dx <= 40 && dy <= 10 ? [{ id: container.id, distance: Math.hypot(dx, dy * 3) }] : [];
+  }).sort((a, b) => a.distance - b.distance);
+  return nearby.length ? [{ id: nearby[0].id }, ...hits] : hits;
+};
 
 export function pointerPosition(event: Event): TablePoint | null {
   if ("clientX" in event && "clientY" in event) {

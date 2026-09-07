@@ -237,6 +237,42 @@ export function orderMeldTiles(tiles: Tile[]): Tile[] {
   return [...tiles];
 }
 
+export type MeldSide = "left" | "right";
+
+// An end target promises insertion on that side, never a silent reorder to
+// the opposite end. Direct tile drops still support deliberate run splits.
+export function extendMeldAtEnd(group: BoardGroup, moving: Tile[], side: MeldSide): Tile[] | null {
+  if (!group.tiles.length || !moving.length) return null;
+  const heldIds = new Set(group.tiles.map((tile) => tile.id));
+  if (moving.some((tile) => heldIds.has(tile.id))) return null;
+  const orderedMoving = orderMeldTiles(moving);
+  const candidate = side === "left" ? [...orderedMoving, ...group.tiles] : [...group.tiles, ...orderedMoving];
+  const analysis = analyzeMeld(candidate);
+  if (!analysis.valid) return null;
+  if (analysis.type === "set") return candidate;
+  const baseAnalysis = analyzeMeld(group.tiles);
+  if (baseAnalysis.valid && baseAnalysis.type === "run") {
+    const firstRegular = group.tiles.findIndex((tile) => tile.color !== "joker");
+    const colour = group.tiles[firstRegular].color;
+    const start = Number(group.tiles[firstRegular].value) - firstRegular;
+    const addedStart = side === "left" ? start - moving.length : start + group.tiles.length;
+    if (addedStart < 1 || addedStart + moving.length - 1 > 13) return null;
+    const remaining = [...moving];
+    const end: Tile[] = [];
+    for (let value = addedStart; value < addedStart + moving.length; value++) {
+      let index = remaining.findIndex((tile) => tile.color === colour && tile.value === value);
+      if (index < 0) index = remaining.findIndex((tile) => tile.color === "joker");
+      if (index < 0) return null;
+      end.push(...remaining.splice(index, 1));
+    }
+    return side === "left" ? [...end, ...group.tiles] : [...group.tiles, ...end];
+  }
+  const ordered = orderMeldTiles(candidate);
+  const movingIds = new Set(moving.map((tile) => tile.id));
+  const end = side === "left" ? ordered.slice(0, moving.length) : ordered.slice(-moving.length);
+  return end.every((tile) => movingIds.has(tile.id)) ? ordered : null;
+}
+
 export function addTileToGroup(groups: BoardGroup[], groupId: string, movingTile: Tile): BoardGroup[] {
   return groups.map((group) => {
     if (group.id !== groupId) return group;

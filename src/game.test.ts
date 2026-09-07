@@ -10,6 +10,7 @@ import {
   addTileToGroup,
   analyzeMeld,
   createDeal,
+  extendMeldAtEnd,
   initialBoard,
   isValidBoard,
   moveBoardTile,
@@ -507,5 +508,33 @@ describe("scoreStalemate", () => {
       Leo: [tile("b5", 5, "cobalt")],
       Maya: [tile("y9", 9, "marigold")],
     }).winner).toBe("You");
+  });
+});
+
+
+describe("approaching a meld from either end", () => {
+  const blue = group("blue", [5, 6, 7, 8].map((n) => tile(`b${n}`, n, "cobalt")));
+  it("places blue 4 before 5–6–7–8 and blue 9 after it", () => {
+    expect(extendMeldAtEnd(blue, [tile("b4", 4, "cobalt")], "left")?.map((t) => t.value)).toEqual([4, 5, 6, 7, 8]);
+    expect(extendMeldAtEnd(blue, [tile("b9", 9, "cobalt")], "right")?.map((t) => t.value)).toEqual([5, 6, 7, 8, 9]);
+    expect(extendMeldAtEnd(blue, [tile("b4", 4, "cobalt")], "right")).toBeNull();
+  });
+  it("allows a batch at the left and rejects wrong colours, gaps, and self-drops", () => {
+    expect(extendMeldAtEnd(blue, [tile("b4", 4, "cobalt"), tile("b3", 3, "cobalt")], "left")?.map((t) => t.value)).toEqual([3, 4, 5, 6, 7, 8]);
+    expect(extendMeldAtEnd(blue, [tile("r4", 4, "terracotta")], "left")).toBeNull();
+    expect(extendMeldAtEnd(blue, [tile("b2", 2, "cobalt")], "left")).toBeNull();
+    expect(extendMeldAtEnd(blue, [blue.tiles[0]], "left")).toBeNull();
+  });
+  it("lets a joker fill either end without moving the existing joker", () => {
+    const joker = tile("j", "★", "joker");
+    expect(extendMeldAtEnd(blue, [joker], "left")?.[0].id).toBe("j");
+    expect(extendMeldAtEnd(blue, [joker], "right")?.at(-1)?.id).toBe("j");
+    const withJoker = group("g", [tile("b5", 5, "cobalt"), joker, tile("b7", 7, "cobalt")]);
+    expect(extendMeldAtEnd(withJoker, [tile("b4", 4, "cobalt")], "left")?.map((t) => t.id)).toEqual(["b4", "b5", "j", "b7"]);
+  });
+  it("preserves the chosen side for equal-number sets", () => {
+    const set = group("s", [tile("r7", 7, "terracotta"), tile("y7", 7, "marigold"), tile("k7", 7, "graphite")]);
+    expect(extendMeldAtEnd(set, [tile("b7", 7, "cobalt")], "left")?.[0].id).toBe("b7");
+    expect(extendMeldAtEnd(set, [tile("b7", 7, "cobalt")], "right")?.at(-1)?.id).toBe("b7");
   });
 });
