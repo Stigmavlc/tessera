@@ -11,6 +11,8 @@ Run `npm test` and `npm run build` first. Start the local preview with `npm run 
 - The drag preview shrinks over the board, stays centred under the pointer, and matches regular or compressed target tiles.
 - Drop an incompatible rack tile directly onto a complete meld: the rack and meld remain unchanged. Place it on empty felt to start a separate draft. Valid extensions and duplicate-run splits still work.
 - Move board tiles onto empty felt, deliberately extend other melds, return this turn’s tiles, and Undo. End Turn still enforces opening points, legal melds, and table conservation.
+- Use Take back after playing several tiles and splitting an existing table group. All groups and positions must return to the turn’s starting state, with this turn’s rack tiles returned. The current rack sorting stays; no tile is drawn and the clock continues. Selection and Undo history clear. Take back is disabled before any table changes and during opponents’ turns.
+- After taking back, start another draft or End Turn to draw exactly one tile. Check that the embossed logo does not intercept taps or drops and that there are no white dots or corner guides.
 
 ## Rack arrangement
 

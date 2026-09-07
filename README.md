@@ -17,6 +17,12 @@ npm run dev
 
 Then open the local URL printed by Vite (the dev server binds all interfaces, so a phone on the same Wi-Fi can use the network URL).
 
+## Physical tiles preview
+
+Add `?tiles=realistic` to the URL to try a textured terracotta rack with supporting ledges, ivory tile faces, moulded edges, and recessed-looking numbers. This appearance experiment is opt-in; removing the parameter restores the usual finish. It can be combined with a player name: `?name=Mara&tiles=realistic`.
+
+The shelf construction is inspired by [physical Rummikub rack reference photos](https://www.toysrus.co.za/rummikub-classic). The preview uses CSS surfaces and keeps the game’s existing tile hit areas and rules.
+
 ## Included interactions
 
 - Animated lobby with one primary Play now action and an always-visible bottom navigation
@@ -39,13 +45,15 @@ Then open the local URL printed by Vite (the dev server binds all interfaces, so
 - Fresh random deal every game — 14 tiles per player, 64 in the pool
 - Strict run, group, joker, 30-point opening-meld, and table-conservation rules
 - One consistently labelled End Turn action: draw one and pass when idle, or submit a legal play
-- Undo, legal table rearrangement, and incomplete-draft recovery
+- Undo a single action, or use Take back to restore the whole current turn’s table and return your played tiles without drawing or resetting the clock
+- Legal table rearrangement and incomplete-draft recovery
 - One-minute timer that auto-submits legal play, restores the table and draws one on an unfinished draft, or draws one when idle
 - Pool-empty endgame: End Turn becomes Pass, three consecutive passes end the round by stalemate, and the lowest rack total wins on differential scoring
 - Legal local turns and separate 30-point openings for Leo and Maya
 - Non-blocking opponent turns that leave the entire table visible
 - One quiet inline game-status line instead of bottom-screen notification overlays
 - High-contrast tile colours reinforced with distinct geometric markers
+- Plain textured felt with a subtle embossed Tessera mark, without dot patterns or corner guides
 - Rack-empty victory, final scoring, and instant replay
 - Camera locked by default, with pan/pinch/zoom one tap away and Fit always available; locking the camera preserves your group positions
 - Sound/haptics settings sheet and table reset

@@ -819,10 +819,9 @@ button:focus-visible,
   touch-action: none;
   background-color: var(--olive);
   background-image:
-    radial-gradient(circle, rgba(244, 234, 215, 0.4) 1.2px, transparent 1.7px),
     url("data:image/svg+xml,%3Csvg viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.48' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='.15'/%3E%3C/svg%3E");
-  background-position: 30px 26px, center;
-  background-size: 64px 64px, 140px 140px;
+  background-position: center;
+  background-size: 140px 140px;
   box-shadow: inset 0 12px 20px rgba(43, 56, 31, 0.16), inset 0 -10px 18px rgba(43, 56, 31, 0.12);
   transition: box-shadow 200ms ease;
 }
@@ -833,46 +832,63 @@ button:focus-visible,
   box-shadow: inset 0 0 0 4px rgba(255, 249, 237, 0.8), inset 0 12px 25px rgba(43, 56, 31, 0.19);
 }
 
-.empty-table-copy {
+/* The existing mark pressed into the felt, below tiles and hit targets. */
+.table-brand {
   position: absolute;
-  top: 18%;
-  right: 24px;
-  left: 24px;
+  inset: 0;
   display: grid;
-  z-index: 3;
+  place-content: center;
   justify-items: center;
-  color: var(--cream-bright);
-  text-align: center;
+  gap: 18px;
   pointer-events: none;
+  user-select: none;
 }
 
-.empty-table-copy strong {
-  font-family: var(--serif);
-  font-size: 24px;
-  letter-spacing: -0.02em;
+.table-brand .brand { padding: 0; gap: 14px; z-index: auto; }
+.table-brand .brand-mark { grid-template-columns: repeat(2, 34px); gap: 4px; }
+.table-brand .brand-mark__cell {
+  width: 34px;
+  border-radius: 7px;
+  background: rgba(98, 119, 77, .3);
+  color: rgba(49, 70, 32, .32);
+  font-size: 17px;
+  box-shadow: -1px -1px 1px rgba(215, 229, 187, .17), 1px 2px 2px rgba(39, 58, 24, .18);
+  text-shadow: 0 1px 1px rgba(220, 233, 193, .24);
 }
-
-.empty-table-copy span {
-  margin-top: 4px;
-  color: rgba(255, 249, 237, 0.72);
-  font-size: 10px;
-  font-weight: 670;
-  letter-spacing: 0.04em;
+.table-brand .brand-name {
+  color: rgba(49, 70, 32, .27);
+  font-size: 25px;
+  font-weight: 650;
+  text-shadow: -1px -1px 1px rgba(214, 230, 184, .16), 1px 1px 1px rgba(39, 58, 24, .2);
 }
+.table-brand__hint { color: rgba(244, 234, 215, .65); font-size: 10px; letter-spacing: .025em; }
 
-.board-guide {
+.board-takeback-button {
   position: absolute;
-  z-index: 4;
-  width: 28px;
-  height: 28px;
-  opacity: 0.67;
-  pointer-events: none;
+  top: 13px;
+  left: 15px;
+  z-index: 6;
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid rgba(244, 234, 215, .45);
+  border-radius: 8px;
+  background: rgba(55, 72, 42, .82);
+  box-shadow: 0 2px 4px rgba(39, 58, 24, .12);
+  color: var(--cream-bright);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 100ms ease, opacity 100ms ease;
 }
-
-.board-guide--tl { top: 15px; left: 15px; border-top: 2px solid var(--cream); border-left: 2px solid var(--cream); }
-.board-guide--tr { top: 15px; right: 15px; border-top: 2px solid var(--cream); border-right: 2px solid var(--cream); }
-.board-guide--bl { bottom: 15px; left: 15px; border-bottom: 2px solid var(--cream); border-left: 2px solid var(--cream); }
-.board-guide--br { right: 15px; bottom: 15px; border-right: 2px solid var(--cream); border-bottom: 2px solid var(--cream); }
+.board-takeback-button svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.board-takeback-button:hover:not(:disabled) { background: rgba(43, 60, 32, .95); }
+.board-takeback-button:active:not(:disabled) { transform: translateY(1px); }
+.board-takeback-button:disabled { opacity: .38; cursor: default; box-shadow: none; }
+.action-button--outline:disabled { opacity: .4; cursor: default; }
 
 .board-world {
   position: absolute;
@@ -1782,4 +1798,13 @@ button:focus-visible,
   .game-actions { grid-column: 2; grid-row: 3; grid-template-columns: 1fr; align-content: center; gap: 6px; padding: 5px 8px; }
   .action-button { min-height: 42px; padding: 0 6px; font-size: 10px; }
   .board-audio { top: 6px; }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .board-takeback-button { top: 6px; min-height: 36px; }
+  .table-brand { gap: 12px; }
+  .table-brand .brand { display: flex; align-items: center; gap: 14px; }
+  .table-brand .brand-mark { grid-template-columns: repeat(2, 24px); gap: 3px; }
+  .table-brand .brand-mark__cell { width: 24px; border-radius: 5px; font-size: 12px; }
+  .table-brand .brand-name { font-size: 20px; }
 }

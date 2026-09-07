@@ -1,0 +1,115 @@
+/* Appearance preview: ?tiles=realistic. Keep the hit areas and table geometry
+   intact; depth is painted with shading rather than perspective transforms. */
+.app-stage--physical .tile {
+  border: 1px solid #c6c0ae;
+  border-radius: 4px 4px 5px 5px;
+  background:
+    linear-gradient(110deg, rgba(255, 255, 255, .8), transparent 28%, rgba(217, 208, 185, .12) 80%, rgba(193, 181, 153, .2)),
+    linear-gradient(#fffef5, #eee9d9);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, .95),
+    inset -1px -1px 0 rgba(153, 141, 114, .26),
+    0 2px 0 #c3baa5,
+    0 3px 0 #948974,
+    1px 5px 4px rgba(23, 25, 22, .3);
+}
+
+.app-stage--physical .tile::before {
+  inset: 1px;
+  border: 0;
+  border-radius: 3px;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.74' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)' opacity='.13'/%3E%3C/svg%3E");
+  background-size: 80px 80px;
+  opacity: .45;
+  pointer-events: none;
+}
+
+.app-stage--physical .tile__number {
+  font-family: "Arial Rounded MT Bold", "Avenir Next", Avenir, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -.07em;
+  text-shadow: 0 -.6px .4px rgba(30, 31, 25, .28), 0 .7px .4px rgba(255, 255, 255, .85);
+}
+
+.app-stage--physical .tile__pip { box-shadow: inset 0 .7px 1px rgba(26, 27, 21, .25); }
+.app-stage--physical .tile--selected {
+  border-color: #2875bf;
+  outline: 2px solid #88c5f7;
+  outline-offset: 1px;
+  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 rgba(153, 141, 114, .25), 0 2px 0 #c3baa5, 0 3px 0 #948974, 0 7px 6px rgba(12, 24, 32, .38);
+}
+.app-stage--physical .rack-section .tile--selected { transform: translateY(-3px); }
+.app-stage--physical .drag-stack .tile--floating {
+  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 rgba(153, 141, 114, .25), 0 2px 0 #c3baa5, 0 3px 0 #948974, 2px 7px 7px rgba(23, 25, 22, .26);
+}
+
+.app-stage--physical .rack-shell {
+  padding: 8px 8px 8px;
+  border: 1px solid #94452d;
+  border-top-color: #edab7e;
+  border-radius: 6px 6px 9px 9px;
+  background:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='mould'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23mould)' opacity='.12'/%3E%3C/svg%3E") center / 100px 100px,
+    linear-gradient(100deg, #d4784c, #bb5836 40%, #ca6a41 80%, #ad4c30);
+  box-shadow:
+    inset 0 2px 0 #eda574,
+    inset 3px 0 3px rgba(101, 39, 21, .42),
+    inset -3px 0 3px rgba(101, 39, 21, .35),
+    inset 0 -4px 0 #843c27,
+    0 3px 0 #93432b,
+    0 7px 8px rgba(102, 51, 28, .28);
+}
+.app-stage--physical .rack-shell::after {
+  inset: 5px 3px 7px auto;
+  width: 3px;
+  height: auto;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #8e3d25, #e59866);
+  filter: none;
+  pointer-events: none;
+}
+.app-stage--physical .rack-shell::before {
+  position: absolute;
+  inset: 5px auto 7px 3px;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #e59866, #8e3d25);
+  content: "";
+  pointer-events: none;
+}
+
+.app-stage--physical .rack-shelves {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-rows: repeat(var(--rack-total-rows, 2), minmax(48px, 1fr));
+  gap: 4px;
+  pointer-events: none;
+}
+.app-stage--physical .rack-shelf { position: relative; }
+.app-stage--physical .rack-shelf::after {
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
+  left: -4px;
+  height: 7px;
+  border: 1px solid #9a4328;
+  border-top-color: #f3b987;
+  border-radius: 2px;
+  background: linear-gradient(#e99b65, #d17c4a 45%, #b75b35 50%, #a84b2d);
+  box-shadow: 0 -2px 4px rgba(99, 35, 17, .18), 0 3px 3px rgba(99, 35, 17, .4);
+  content: "";
+}
+.app-stage--physical .rack-tile { position: relative; z-index: 2; align-items: end; padding-bottom: 3px; }
+.app-stage--physical .rack-tile .tile { width: min(100%, 38px); }
+.app-stage--physical .rack-section--over .rack-shell { outline-color: #b7d9ed; }
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .app-stage--physical .rack-shell { padding-top: 3px; padding-bottom: 5px; }
+  .app-stage--physical .rack-shelves { grid-template-rows: repeat(var(--rack-total-rows, 1), minmax(40px, 1fr)); gap: 2px; }
+  .app-stage--physical .rack-tile { padding-bottom: 1px; }
+  .app-stage--physical .rack-tile .tile { width: 30px; }
+  .app-stage--physical .rack-shelf::after { height: 5px; bottom: -2px; }
+}

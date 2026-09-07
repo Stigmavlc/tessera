@@ -76,6 +76,8 @@ const clonePositions = (positions: TablePositions): TablePositions => Object.fro
 // UI shows it. Engine state keeps the internal "You" key — display only.
 const localPlayerName = (new URLSearchParams(window.location.search).get("name")?.trim() || "You").slice(0, 12);
 const localPlayerInitial = localPlayerName.charAt(0).toUpperCase();
+// Opt-in appearance experiment; the normal link keeps the existing finish.
+const physicalTilesPreview = new URLSearchParams(window.location.search).get("tiles") === "realistic";
 
 const defaultCamera: BoardCamera = { x: 0, y: 6, zoom: 0.58 };
 const sealDraftSlot = (groups: BoardGroup[], id: string): BoardGroup[] => {
@@ -1044,6 +1046,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
   };
 
   const handleUndo = () => {
+    if (turnState !== "you" || winner || activeTile) return;
     const previous = history.at(-1);
     if (!previous) {
       setToast("Nothing to undo yet");
@@ -1055,6 +1058,22 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     setMoveCount(previous.moveCount);
     setHistory((items) => items.slice(0, -1));
     setSelectedIds([]);
+  };
+
+  const handleTakeBack = () => {
+    if (turnState !== "you" || winner || activeTile || history.length === 0) return;
+    // Restore the entire draft: merely removing rack tiles could leave table
+    // melds broken after the player has split or rearranged them.
+    setBoard(cloneBoard(turnStart.board));
+    setRack(withRackOrder(turnStart.rack, rack));
+    setGroupPositions(clonePositions(turnStartPositions));
+    setHistory([]);
+    setMoveCount(0);
+    setSelectedIds([]);
+    setHoverGroupId(null);
+    setToast("Turn taken back · your turn continues");
+    if (sfxOn) playTilePlace();
+    if (haptics && "vibrate" in navigator) navigator.vibrate(14);
   };
 
   const handleDraw = () => {
@@ -1216,14 +1235,21 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
             );
           })}
         >
-          <div className="board-guide board-guide--tl" /><div className="board-guide board-guide--tr" />
-          <div className="board-guide board-guide--bl" /><div className="board-guide board-guide--br" />
-          {boardIsEmpty && (
-            <div className="empty-table-copy" aria-hidden="true">
-              <strong>Fresh table</strong>
-              <span>Tap or drag tiles onto the felt</span>
-            </div>
-          )}
+          <div className="table-brand" aria-hidden="true">
+            <BrandMark />
+            {boardIsEmpty && <span className="table-brand__hint">Tap or drag tiles onto the felt</span>}
+          </div>
+          <button
+            className="board-takeback-button"
+            type="button"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => { event.stopPropagation(); handleTakeBack(); }}
+            disabled={history.length === 0 || turnState !== "you" || !!winner || !!activeTile}
+            aria-label="Take back all changes this turn"
+            title="Return this turn’s tiles and restore the table. Your turn and timer continue."
+          >
+            <UndoIcon /><span>Take back</span>
+          </button>
           <AnimatePresence>{celebrating && <ConfettiBurst />}</AnimatePresence>
         </BoardDropZone>
 
@@ -1242,6 +1268,11 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
               className="rack-grid"
               style={{ "--rack-columns": rackColumns, "--rack-total-rows": Math.max(rackRows, visibleRackRows) } as CSSProperties}
             >
+              {physicalTilesPreview && (
+                <div className="rack-shelves" aria-hidden="true">
+                  {Array.from({ length: Math.max(rackRows, visibleRackRows) }, (_, row) => <div className="rack-shelf" key={row} />)}
+                </div>
+              )}
               <SortableContext items={rack.map((entry) => entry.id)} strategy={rectSortingStrategy}>
                 {rack.map((entry) => (
                   <SortableTile
@@ -1295,7 +1326,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
       </DndContext>
 
       <section className="game-actions">
-        <motion.button className="action-button action-button--outline" type="button" onClick={handleUndo} whileTap={{ scale: 0.96 }}>
+        <motion.button className="action-button action-button--outline" type="button" onClick={handleUndo} disabled={history.length === 0 || turnState !== "you" || !!winner || !!activeTile} whileTap={{ scale: 0.96 }}>
           <UndoIcon /> <span>Undo</span>
         </motion.button>
         <motion.button
@@ -1769,7 +1800,7 @@ function App() {
   }, [screen, musicOn]);
 
   return (
-    <div className="app-stage">
+    <div className={`app-stage${physicalTilesPreview ? " app-stage--physical" : ""}`}>
       <div className="sun-disc" aria-hidden="true" />
       <div className="plate-motif" aria-hidden="true"><span /></div>
       <div className="phone-shell">
