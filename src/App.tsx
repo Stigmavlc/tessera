@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -19,7 +19,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
+import { AnimatePresence, motion, useMotionValue } from "framer-motion";
 import {
   BoardGroup,
   Deal,
@@ -37,6 +37,7 @@ import {
   moveBoardTiles,
   orderMeldTiles,
   playOpponentTurn,
+  removeBoardTiles,
   resolveTileDrop,
   resolveTimeout,
   scoreRound,
@@ -47,7 +48,7 @@ import {
 } from "./game";
 import { opponentPlayFrames } from "./opponent-presentation";
 import { playTick, playTilePlace, setMusic } from "./audio";
-import { BoardCamera, TablePoint, TablePositions, tableWorldSize, positionTableGroups as arrangeTableGroups } from "./layout";
+import { BoardCamera, TableBounds, TablePoint, TablePositions, fitTableCamera, tableBounds, tableWorldSize, positionTableGroups as arrangeTableGroups } from "./layout";
 import { approachedMeld, centerDragOnPointer, moveRackSelection, pointerPosition, tabletopCollision, withRackOrder, worldPoint } from "./interactions";
 
 type Screen = "home" | "game";
@@ -585,8 +586,15 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, []);
-  const positionTableGroups = (groups: BoardGroup[], positions: TablePositions, movedId?: string) =>
-    arrangeTableGroups(groups, positions, stageSize, movedId);
+  const positionTableGroups = (groups: BoardGroup[], positions: TablePositions, movedId?: string) => {
+    const seeded = { ...positions };
+    for (const group of groups) {
+      if (seeded[group.id] || !group.tiles.length) continue;
+      const source = board.find((previous) => previous.tiles.some((tile) => tile.id === group.tiles[0].id));
+      if (source) seeded[group.id] = positions[source.id] ?? { x: 18, y: 18 };
+    }
+    return arrangeTableGroups(groups, seeded, stageSize, movedId);
+  };
   const [timer, setTimer] = useState(60);
   const [turnState, setTurnState] = useState<TurnState>("you");
   const [activeOpponent, setActiveOpponent] = useState<OpponentName>("Leo");
@@ -633,6 +641,14 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     () => arrangeTableGroups(board, groupPositions, stageSize),
     [board, groupPositions, stageSize],
   );
+  const occupiedBounds = useMemo(() => tableBounds(board, layoutPositions, stageSize), [board, layoutPositions, stageSize]);
+  const previousStageSize = useRef(stageSize);
+  useLayoutEffect(() => {
+    if (viewMode !== "locked" || activeTile) return;
+    const resized = previousStageSize.current.width !== stageSize.width || previousStageSize.current.height !== stageSize.height;
+    previousStageSize.current = stageSize;
+    setBoardCamera((current) => fitTableCamera(occupiedBounds, stageSize, current, resized));
+  }, [occupiedBounds, stageSize, viewMode, activeTile]);
   const rackCapacity = Math.max(7, Math.floor((stageSize.width - 42) / 38));
   const rackColumns = Math.min(rackCapacity, Math.max(7, Math.ceil(rack.length / (landscape ? 1 : 2))));
   const rackRows = Math.max(landscape ? 1 : 2, Math.ceil(rack.length / rackColumns));
@@ -975,9 +991,8 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
       const endTiles = target && extendMeldAtEnd(target, moving, side);
       if (!endTiles) return;
       remember();
-      const nextBoard = board.map((group) => group.id === fromGroupId
-        ? { ...group, tiles: group.tiles.filter((tile) => !tileIds.includes(tile.id)) }
-        : group.id === toGroupId ? { ...group, tiles: endTiles } : group)
+      const nextBoard = removeBoardTiles(board, tileIds, fromGroupId)
+        .map((group) => group.id === toGroupId ? { ...group, tiles: endTiles } : group)
         .filter((group) => group.id === "new-meld" || group.tiles.length);
       setBoard(nextBoard);
       setGroupPositions((current) => positionTableGroups(nextBoard, current));
@@ -1002,9 +1017,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     const movingTile = board.find((group) => group.id === fromGroupId)?.tiles
       .find((entry) => entry.id === tileId);
     if (!movingTile) return;
-    const removed = board.map((group) => group.id === fromGroupId
-      ? { ...group, tiles: group.tiles.filter((entry) => entry.id !== tileId) }
-      : group);
+    const removed = removeBoardTiles(board, tileIds, fromGroupId);
     const splitId = `split-${turnNumber}-${moveCount + 1}-${tileId}`;
     const resolution = resolveTileDrop(removed, toGroupId, [movingTile], targetIndex, splitId);
     if (resolution.kind === "draft" && !isCompatibleMeldDraft(resolution.groups.find((group) => group.id === toGroupId)?.tiles ?? [])) {
@@ -1043,11 +1056,8 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
 
     const groupId = `split-${turnNumber}-${moveCount + 1}-${tileIds[0]}`;
     const nextBoard: BoardGroup[] = [
-      ...board
+      ...removeBoardTiles(board, tileIds, fromGroupId)
         .filter((group) => group.id !== "new-meld")
-        .map((group) => group.id === fromGroupId
-          ? { ...group, tiles: group.tiles.filter((entry) => !idSet.has(entry.id)) }
-          : group)
         .filter((group) => group.tiles.length > 0),
       { id: groupId, kind: "new", tiles: movingTiles },
       { id: "new-meld", kind: "new", tiles: [] },
@@ -1070,10 +1080,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
     if (returningTiles.length === 0) return;
 
     remember();
-    const nextBoard = board
-      .map((group) => group.id === fromGroupId
-        ? { ...group, tiles: group.tiles.filter((entry) => !idSet.has(entry.id)) }
-        : group)
+    const nextBoard = removeBoardTiles(board, tileIds, fromGroupId)
       .filter((group) => group.id === "new-meld" || group.tiles.length > 0);
     setBoard(nextBoard);
     setGroupPositions((current) => positionTableGroups(nextBoard, current));
@@ -1349,7 +1356,12 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
   return (
     <motion.main
       className={`screen game-screen ${turnState === "you" && !winner ? "game-screen--your-turn" : "game-screen--opponent-turn"}`}
-      style={{ "--rack-rows": visibleRackRows, "--board-zoom": boardCamera.zoom } as CSSProperties}
+      style={{
+        "--rack-rows": visibleRackRows,
+        "--board-zoom": boardCamera.zoom,
+        "--table-world-width": `${tableWorldSize(stageSize).width}px`,
+        "--table-world-height": `${tableWorldSize(stageSize).height}px`,
+      } as CSSProperties}
       initial={{ opacity: 0, x: 36 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 36 }}
@@ -1378,6 +1390,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
           empty={boardIsEmpty}
           onTableTap={handleTableTap}
           camera={boardCamera}
+          bounds={occupiedBounds}
           audioControls={
             <>
               <AudioToggle kind="music" on={musicOn} onChange={onMusicChange} />
@@ -1442,7 +1455,7 @@ function GameScreen({ onBack, musicOn, sfxOn, haptics, onMusicChange, onSfxChang
           label={`Your tile rack. ${rack.length} tiles. Tap to select; hold to select tiles to the right.`}
         >
           <div className="turn-banner" role="status" aria-live="polite">
-            <strong>{turnState === "you" ? "Your turn" : `${activeOpponent}’s turn`}</strong>
+            <strong>{turnState === "you" && <span className="turn-banner__marker" aria-hidden="true">▶</span>}{turnState === "you" ? "YOUR TURN" : `${activeOpponent}’s turn`}</strong>
             <span>{turnState === "you" ? opponentSummary.join(" · ") || "Choose your tiles" : opponentActivity || "Thinking…"}</span>
             {turnState === "you" && <b aria-hidden="true">{Math.floor(timer / 60)}:{String(timer % 60).padStart(2, "0")}</b>}
           </div>
@@ -1612,6 +1625,7 @@ function BoardDropZone({
   empty = false,
   onTableTap,
   camera,
+  bounds,
   onCameraChange,
   viewMode,
   onToggleViewMode,
@@ -1624,6 +1638,7 @@ function BoardDropZone({
   empty?: boolean;
   onTableTap: (position: TablePoint) => void;
   camera: BoardCamera;
+  bounds: TableBounds | null;
   onCameraChange: (camera: BoardCamera) => void;
   viewMode: "locked" | "free";
   onToggleViewMode: () => void;
@@ -1651,16 +1666,10 @@ function BoardDropZone({
   const suppressClickRef = useRef(false);
   const wheelCommitRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     cameraRef.current = camera;
-    if (viewMode === "locked") {
-      const controls = [
-        animate(cameraX, camera.x, { type: "spring", stiffness: 170, damping: 26 }),
-        animate(cameraY, camera.y, { type: "spring", stiffness: 170, damping: 26 }),
-        animate(cameraZoom, camera.zoom, { type: "spring", stiffness: 170, damping: 26 }),
-      ];
-      return () => controls.forEach((control) => control.stop());
-    }
+    // Settle framing before measuring an opponent's landing target. Animating
+    // the camera here makes the tile fly to an outdated screen position.
     cameraX.set(camera.x);
     cameraY.set(camera.y);
     cameraZoom.set(camera.zoom);
@@ -1828,20 +1837,7 @@ function BoardDropZone({
 
   const fitBoard = (element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
-    const groups = [...element.querySelectorAll(".meld-position")].map((group) => group.getBoundingClientRect());
-    if (!groups.length) { onCameraChange(defaultCamera); return; }
-    const currentZoom = cameraZoom.get();
-    const left = (Math.min(...groups.map((group) => group.left)) - rect.left - cameraX.get()) / currentZoom;
-    const top = (Math.min(...groups.map((group) => group.top)) - rect.top - cameraY.get()) / currentZoom;
-    const width = (Math.max(...groups.map((group) => group.right)) - Math.min(...groups.map((group) => group.left))) / currentZoom;
-    const height = (Math.max(...groups.map((group) => group.bottom)) - Math.min(...groups.map((group) => group.top))) / currentZoom;
-    const zoom = Math.min(defaultCamera.zoom, (rect.width - 16) / width, (rect.height - 16) / height);
-    const fitted = {
-      zoom,
-      x: (rect.width - width * zoom) / 2 - left * zoom,
-      y: (rect.height - height * zoom) / 2 - top * zoom,
-    };
-    const next = applyCamera(fitted, rect);
+    const next = bounds ? fitTableCamera(bounds, rect, cameraRef.current, true) : defaultCamera;
     onCameraChange(next);
   };
 
@@ -1899,7 +1895,7 @@ function BoardDropZone({
       <button
         className="board-lock-button"
         type="button"
-        aria-label={viewMode === "locked" ? "Enable table panning and zooming" : "Lock the camera without rearranging tiles"}
+        aria-label={viewMode === "locked" ? "Enable table panning and zooming" : "Keep all tiles visible automatically"}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => { event.stopPropagation(); onToggleViewMode(); }}
       >
@@ -1908,7 +1904,7 @@ function BoardDropZone({
             ? <path d="M6 9V6a4 4 0 1 1 8 0v3M5 9h10v7H5z" />
             : <path d="M6 9V6a4 4 0 0 1 7.6-1.6M5 9h10v7H5z" />}
         </svg>
-        <span>{viewMode === "locked" ? "Pan off" : "Pan on"}</span>
+        <span>{viewMode === "locked" ? "Auto fit" : "Free pan"}</span>
       </button>
     </div>
     </div>

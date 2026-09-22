@@ -67,7 +67,7 @@ Group positions live in `groupPositions: TablePositions` (world-percent coordina
 
 ### Camera lock (default) vs. free camera
 
-`viewMode: "locked" | "free"` persists to `localStorage["tessera.viewMode"]`. It controls camera gestures only. Locked mode is labelled “Pan off”; free mode is “Pan on”. Both use `groupPositions` and `boardCamera`. Toggling must not repack groups, change their coordinates, or reset the camera. Fit remains available in both modes. The former `layoutLockedBoard` auto-arrangement was removed because it ignored the player’s intended drop positions.
+`viewMode: "locked" | "free"` persists to `localStorage["tessera.viewMode"]`. Locked mode is labelled “Auto fit”: `tableBounds` and `fitTableCamera` keep all occupied groups inside the stage after moves and resizes, deferring changes during a tile drag. The camera pans only as far as needed, reducing zoom if necessary; viewport changes and explicit Fit centre the table at up to normal zoom. Free mode is labelled “Free pan” and preserves manual exploration. Switching back to Auto fit restores visibility without repacking the player’s groups. Camera values settle before opponent flight targets are measured; do not animate camera changes independently of the flight.
 
 ### Camera (pan / pinch / zoom, free mode only)
 
@@ -118,7 +118,7 @@ Pool-empty endgame: once the pool is empty, "End turn" becomes "Pass" (`handlePa
 - `DroppableGroup` is rendered only for `visibleBoard` (groups with tiles), and the `new-meld` sentinel can only receive tiles via a drop/tap on a rendered group — so it is never rendered, and its `group.tiles.length === 0` placeholder branch (plus `new-meld--ready` and the `groupId !== "new-meld"` guard in `placeTiles`) is unreachable in the running game.
 - `musicOn` gates music; `sfxOn` gates effects and the timer tick; `haptics` gates `navigator.vibrate`. These settings persist separately.
 - `Project_Master_and_changelog.md` is project documentation, not app state. Keep its current decisions aligned with the implementation.
-- Position bookkeeping matters in both camera modes. Never treat “Pan off” as permission to repack the table.
+- Position bookkeeping matters in both camera modes. Auto fit adjusts the camera, not the player’s requested group positions.
 - The realistic terracotta finish is the default for the normal URL and `?name=` links. `?tiles=realistic` is an obsolete preview parameter and no longer gates rendering.
 - The embossed table brand and shelf overlays must remain `pointer-events: none`. Table buttons must not trigger panning or place selected tiles.
 
@@ -140,4 +140,10 @@ Local follow-up (not yet published): easier meld association, visible turn banne
 
 Validation: 71 automated tests and production build; touch checks cover slow single-tile pickup, immediate invalid-join rejection, legal incremental runs, Take back, and a crowded 52-tile table with separate controls in four phone viewports.
 
-The virtual table uses `tableWorldSize` (at least 680×960 world pixels), mirrored in `.board-world`, so short viewports do not collapse the placement space and stack groups. Camera bounds use those dimensions. Fit computes the actual occupied group bounds and centres them with padding, allowing an overview zoom down to 0.08; normal starting tile size stays at zoom 0.58. Keep CSS dimensions, placement footprints and camera math consistent. Crowded-table browser checks must verify every tile is visible after Fit, not just that the controls are outside the stage.
+The virtual table uses `tableWorldSize` (at least 680×960 world pixels), with the stage’s aspect ratio. The exact dimensions are passed to `.board-world` through CSS variables. New unpositioned groups minimise the occupied extent relative to the screen; explicitly positioned groups retain nearby collision resolution. Normal starting tile size stays at zoom 0.58. Keep CSS dimensions, placement footprints and camera math consistent. Crowded-table checks must verify automatic visibility without pressing Fit, including after later moves.
+
+### 2026-09-22 tester follow-up
+
+`removeBoardTiles` is the shared extraction path for board moves, explicit meld-end joins, empty-felt drops and rack returns. A valid run is split into its remaining contiguous stretches, preserving displayed joker order and distinct group IDs. Short halves remain drafts; sets and end extractions stay together. Seed new halves near their source and preserve Undo/Take back snapshots.
+
+Phone controls reserve less vertical space, adding 57px of felt in the tested portrait viewports while keeping 64px rack rows. Your turn uses a dark navy header and band, uppercase label, gold marker and rack outline. Validation: 82 unit tests, production build, touch extraction/return/join/recovery checks, 52-tile automatic framing across four phone viewports, later additions, manual camera recovery and opponent flight/reset checks.

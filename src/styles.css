@@ -897,8 +897,8 @@ button:focus-visible,
   top: 0;
   left: 0;
   z-index: 2;
-  width: max(170%, 680px);
-  height: max(170%, 960px);
+  width: var(--table-world-width, max(170%, 680px));
+  height: var(--table-world-height, max(170%, 960px));
   transform-origin: 0 0;
   will-change: transform;
 }
@@ -1850,12 +1850,16 @@ button:focus-visible,
 .turn-banner strong { flex: 0 0 auto; font-size: 14px; }
 .turn-banner > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 .turn-banner b { font-size: 16px; font-variant-numeric: tabular-nums; }
-.game-screen--your-turn .turn-banner { color: #fff9ed; background: #165eb6; border-bottom-color: #084a96; box-shadow: 0 -3px 0 rgba(118, 183, 245, .7); }
-.game-screen--your-turn .game-header { background: #e4effa; border-bottom-color: #78a8da; }
-.game-screen--your-turn .turn-title strong { color: #145aa8; }
-.game-screen--your-turn .timer { border-color: #165eb6; }
-.game-screen--your-turn .rail-player--active { border-bottom-color: #165eb6; }
-.game-screen--your-turn .rack-section { box-shadow: 0 -5px 15px rgba(30, 102, 181, .2); }
+.game-screen--your-turn .turn-banner { color: #fff9ed; background: #102e50; border-bottom-color: #102e50; box-shadow: inset 0 3px #f8cd64; }
+.game-screen--your-turn .turn-banner strong { font-size: 16px; letter-spacing: .06em; }
+.turn-banner__marker { margin-right: 8px; color: #f8cd64; }
+.game-screen--your-turn .game-header { color: #fff9ed; background: #102e50; border-bottom-color: #102e50; }
+.game-screen--your-turn .turn-title strong { color: #fff9ed; }
+.game-screen--your-turn .turn-title__eyebrow { color: #d4e1ee; }
+.game-screen--your-turn .timer { color: #fff9ed; background: #102e50; border-color: #f8cd64; box-shadow: none; }
+.game-screen--your-turn .timer--urgent { background: #b63d24; }
+.game-screen--your-turn .rail-player--active { border-bottom-color: #102e50; }
+.game-screen--your-turn .rack-shell { outline: 3px solid #102e50; outline-offset: -1px; }
 .opponent-tile-added .tile { outline: 2px solid #f8cd64; outline-offset: 2px; }
 .opponent-tile-in-flight { visibility: hidden; }
 .opponent-flight { position: fixed; left: 0; top: 0; z-index: 55; pointer-events: none; }
@@ -1869,8 +1873,8 @@ button:focus-visible,
 }
 
 /* Keep camera controls outside the measured, clipped tile surface. */
-.board-area { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 42px; }
-.board-toolbar { display: flex; align-items: center; gap: 5px; padding: 4px 6px; background: #526641; }
+.board-area { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 38px; }
+.board-toolbar { display: flex; align-items: center; gap: 5px; padding: 3px 6px; background: #526641; }
 .board-toolbar .board-fit-button, .board-toolbar .board-lock-button { position: static; flex: 0 0 auto; min-height: 32px; }
 
 .board-toolbar .board-takeback-button { position: static; flex: 0 0 auto; min-height: 32px; padding: 0 7px; font-size: 10px; }
@@ -1878,3 +1882,24 @@ button:focus-visible,
 .board-toolbar .audio-toggle { width: 32px; height: 32px; }
 .board-toolbar .board-lock-button { order: 3; }
 .board-toolbar .board-fit-button { order: 4; }
+
+/* Give the felt the saved space; keep the rack's 64px rows unchanged. */
+@media (max-width: 520px) and (orientation: portrait) {
+  .game-screen { grid-template-rows: calc(48px + env(safe-area-inset-top)) 44px minmax(80px, 1fr) calc(96px + var(--rack-rows, 2) * 64px) calc(56px + env(safe-area-inset-bottom)); }
+  .game-header { padding: max(3px, env(safe-area-inset-top)) 8px 3px; grid-template-columns: 36px 1fr 44px 36px; }
+  .turn-title { bottom: 8px; }
+  .turn-title strong { font-size: 16px; }
+  .timer { width: 40px; border-width: 2px; font-size: 12px; }
+  .player-rail { padding: 2px 10px; }
+  .rail-player { padding: 1px 3px; gap: 5px; }
+  .rail-player .avatar { width: 30px; flex-basis: 30px; }
+  .rail-player .avatar__initials { font-size: 14px; }
+  .rack-section { grid-template-rows: 38px 36px minmax(0, 1fr) 22px; }
+  .rack-tools button { min-height: 32px; }
+  .game-actions { padding: 3px 12px max(3px, env(safe-area-inset-bottom)); }
+  .action-button { min-height: 46px; }
+}
+@media (orientation: landscape) and (max-height: 600px) {
+  .game-screen { grid-template-rows: 44px minmax(80px, 1fr) calc(90px + var(--rack-rows, 1) * 48px); }
+  .rack-section { grid-template-rows: 34px 34px minmax(0, 1fr) 22px; }
+}

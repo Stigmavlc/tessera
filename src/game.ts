@@ -301,6 +301,43 @@ export function addTileToGroup(groups: BoardGroup[], groupId: string, movingTile
   });
 }
 
+// Keep the remaining stretches independent when a tile is lifted out of a
+// run. Do not close the gap or let a joker jump across it. Short stretches
+// remain drafts that must be repaired before the turn can be committed.
+export function removeBoardTiles(groups: BoardGroup[], tileIds: string[], fromGroupId: string): BoardGroup[] {
+  const ids = new Set(tileIds);
+  const source = groups.find((group) => group.id === fromGroupId);
+  if (!source?.tiles.some((tile) => ids.has(tile.id))) return groups;
+  const analysis = analyzeMeld(source.tiles);
+  const remaining = source.tiles.filter((tile) => !ids.has(tile.id));
+  if (!analysis.valid || analysis.type !== "run") {
+    return groups.map((group) => group === source ? { ...group, tiles: remaining } : group);
+  }
+  const stretches: Tile[][] = [];
+  let stretch: Tile[] = [];
+  for (const tile of source.tiles) {
+    if (ids.has(tile.id)) {
+      if (stretch.length) stretches.push(stretch);
+      stretch = [];
+    } else stretch.push(tile);
+  }
+  if (stretch.length) stretches.push(stretch);
+  const usedIds = new Set(groups.map((group) => group.id));
+  const replacements = stretches.map((tiles, index): BoardGroup => {
+    let id = source.id;
+    if (index > 0) {
+      const prefix = `${source.id}-part-${tiles[0].id}`;
+      id = prefix;
+      for (let suffix = 1; usedIds.has(id); suffix++) id = `${prefix}-${suffix}`;
+      usedIds.add(id);
+    }
+    return { ...source, id, tiles };
+  });
+  return groups.flatMap((group) => group === source
+    ? replacements.length ? replacements : [{ ...source, tiles: [] }]
+    : [group]);
+}
+
 export function moveBoardTile(
   groups: BoardGroup[],
   tileId: string,
@@ -327,8 +364,7 @@ export function moveBoardTile(
     });
   }
 
-  return groups.map((group) => {
-    if (group.id === fromGroupId) return { ...group, tiles: group.tiles.filter((entry) => entry.id !== tileId) };
+  return removeBoardTiles(groups, [tileId], fromGroupId).map((group) => {
     if (group.id === toGroupId) {
       const nextTiles = [...group.tiles];
       const insertionIndex = targetIndex === undefined
@@ -359,10 +395,7 @@ export function moveBoardTiles(
     .filter((entry) => movingIdSet.has(entry.id)) ?? [];
   if (movingTiles.length === 0) return groups;
 
-  return groups.map((group) => {
-    if (group.id === fromGroupId) {
-      return { ...group, tiles: group.tiles.filter((entry) => !movingIdSet.has(entry.id)) };
-    }
+  return removeBoardTiles(groups, tileIds, fromGroupId).map((group) => {
     if (group.id === toGroupId) {
       const nextTiles = [...group.tiles];
       const insertionIndex = targetIndex === undefined

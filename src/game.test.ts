@@ -19,6 +19,7 @@ import {
   orderMeldTiles,
   playOpponentTurn,
   rackScore,
+  removeBoardTiles,
   resolveTimeout,
   resolveTileDrop,
   scoreRound,
@@ -579,5 +580,46 @@ describe("joining compatible drafts", () => {
     expect(isCompatibleMeldDraft([tile("a", 1, "cobalt"), tile("j", "★", "joker"), tile("b", 3, "cobalt")])).toBe(true);
     const one = tile("a", 4, "graphite");
     expect(isCompatibleMeldDraft([one, one])).toBe(false);
+  });
+});
+
+describe("lifting tiles out of runs", () => {
+  const run = group("run", [1, 2, 3, 4, 5, 6, 7].map((n) => tile(`b${n}`, n, "cobalt")));
+  it("separates both remaining runs when the middle tile moves to another meld", () => {
+    const target = group("fours", [tile("r4", 4, "terracotta"), tile("y4", 4, "marigold")]);
+    const before = [run, target, ...initialBoard];
+    for (const move of [moveBoardTile(before, "b4", "run", "fours"), moveBoardTiles(before, ["b4"], "run", "fours")]) {
+      expect(move.filter((g) => g.tiles.length).map((g) => g.tiles.map((t) => t.value)))
+        .toEqual([[1, 2, 3], [5, 6, 7], [4, 4, 4]]);
+      expect(isValidBoard(move)).toBe(true);
+      expect(move.flatMap((g) => g.tiles.map((t) => t.id)).sort()).toEqual(before.flatMap((g) => g.tiles.map((t) => t.id)).sort());
+      expect(move.at(-1)?.id).toBe("new-meld");
+    }
+    expect(run.tiles).toHaveLength(7);
+  });
+  it("keeps short halves separate and requires repair before committing", () => {
+    const result = removeBoardTiles([run], ["b3", "b4"], "run");
+    expect(result.map((g) => g.tiles.map((t) => t.value))).toEqual([[1, 2], [5, 6, 7]]);
+    expect(isValidBoard(result)).toBe(false);
+  });
+  it("splits at the removed joker instead of closing the missing number", () => {
+    const withJoker = group("j", [tile("b1", 1, "cobalt"), tile("b2", 2, "cobalt"), tile("j", "★", "joker"), tile("b4", 4, "cobalt"), tile("b5", 5, "cobalt")]);
+    expect(removeBoardTiles([withJoker], ["j"], "j").map((g) => g.tiles.map((t) => t.value))).toEqual([[1, 2], [4, 5]]);
+  });
+  it("does not split a set or an end extraction, and leaves unrelated groups intact", () => {
+    const set = group("set", [tile("r4", 4, "terracotta"), tile("y4", 4, "marigold"), tile("k4", 4, "graphite")]);
+    const after = removeBoardTiles([run, set], ["y4"], "set");
+    expect(after).toHaveLength(2);
+    expect(after[0]).toBe(run);
+    expect(after[1].tiles.map((t) => t.id)).toEqual(["r4", "k4"]);
+    expect(removeBoardTiles([run], ["b1"], "run")).toHaveLength(1);
+    expect(removeBoardTiles([run], ["b7"], "run")).toHaveLength(1);
+  });
+  it("gives repeated splits distinct group identities", () => {
+    const occupied = group("run-part-b5", [tile("k1", 1, "graphite")]);
+    const result = removeBoardTiles([run, occupied, ...initialBoard], ["b4"], "run");
+    expect(new Set(result.map((g) => g.id)).size).toBe(result.length);
+    expect(result[1].tiles[0].id).toBe("b5");
+    expect(result.at(-1)?.id).toBe("new-meld");
   });
 });

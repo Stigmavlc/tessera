@@ -28,14 +28,14 @@ The shelf construction is inspired by [physical Rummikub rack reference photos](
 - Animated lobby with one primary Play now action and an always-visible bottom navigation
 - Free-positioned felt canvas: tap or drop selected tiles anywhere to create a meld
 - Collision-aware meld placement that keeps player and AI groups from visually overlapping
-- Larger virtual tabletop; switch to the free camera for one-finger/mouse-drag panning, pinch/wheel zoom, and Fit recovery
+- Larger visible tabletop with compact phone controls; automatic framing keeps tiles visible after every move and resize. New AI groups use the screen’s width instead of piling up vertically
 - Tap to select rack tiles, or hold a tile to progressively select tiles to its right; drag the batch as one move
 - Compatible melds, including unfinished pairs, show insertion previews and generous end targets; nearby taps and drags use the same association rules; nearby drops along the same row attach automatically, while empty space below remains available for separate groups
 - Precise pointer-based drop targets, with a drag preview that matches the tile size on the board
 - Incompatible rack additions leave complete melds intact; incomplete drafts and deliberate run splits remain supported
 - Drop a duplicate tile mid-run to split it into two melds, exactly like the boxed rules
 - A board drag always moves one tile, even after holding; multi-tile rack selection remains available
-- Split a table meld by dragging a tile onto empty felt, then recombine it by dropping onto another tile or meld
+- Removing a middle tile from a run automatically separates its remaining stretches, whether moving onto felt, joining another meld, or returning a tile to the rack
 - Reject duplicate colours/numbers and unfilled run gaps when joining tiles; allow compatible pairs while building, and temporary incomplete groups after extracting tiles, with full legality checked at commit
 - Return any rack tile played this turn using its table remove control or by dragging it back
 - Numeric draft ordering and tile-level drop targets for table repositioning
@@ -52,13 +52,13 @@ The shelf construction is inspired by [physical Rummikub rack reference photos](
 - Pool-empty endgame: End Turn becomes Pass, three consecutive passes end the round by stalemate, and the lowest rack total wins on differential scoring
 - Legal local turns and separate 30-point openings for Leo and Maya
 - Opponents lift and drag tiles face down from their seat, revealing the number only when each tile lands; additions stay highlighted through your next turn, and drawn tiles remain face down
-- A blue Your turn band beside the rack and matching header make the active turn obvious; the full player minute starts after opponent animations finish
+- A dark navy YOUR TURN band with a gold marker, matching header and outlined rack make the active turn obvious; the full player minute starts after opponent animations finish
 - One quiet inline game-status line instead of bottom-screen notification overlays
 - High-contrast tile colours reinforced with distinct geometric markers
 - Plain textured felt with a subtle embossed Tessera mark, without dot patterns or corner guides
 - Rack-empty victory, final scoring, and instant replay
 - Table controls occupy a separate strip outside the tile surface, so even crowded boards cannot cover them
-- Camera locked by default, with pan/pinch/zoom one tap away and Fit always available; locking the camera preserves your group positions
+- Auto fit is the default; Free pan enables pan/pinch/zoom, and Fit remains available for manual recovery. Switching back to Auto fit keeps all tiles visible without repacking the player’s groups
 - Sound/haptics settings sheet and table reset
 - Responsive portrait and full-width mobile landscape play, with a framed desktop presentation and safe-area spacing
 - Reduced-motion support

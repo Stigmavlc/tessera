@@ -14,14 +14,14 @@
 - [x] Responsive selection, progressive hold-to-select, and batch dragging
 - [x] 789 / 777 rack sorting and manual arrangement during every player’s turn
 - [x] Precise pointer-based drops, separate placement on empty felt, and board-sized drag previews
-- [x] Camera lock preserves group positions; pan/pinch/zoom and Fit remain available
+- [x] Auto fit keeps tiles visible after moves and resizes; Free pan preserves manual exploration and group positions
 - [x] Readable large racks and full-width mobile landscape play
 - [x] One-tap Take back for the entire current turn, alongside single-action Undo
 - [x] Plain textured felt with embossed Tessera branding; white dots and corner guides removed
 - [x] Realistic ivory tiles and a textured terracotta rack with raised row ledges, now the default
 - [x] Terracotta-rack release published to GitHub Pages and verified using the original Mara link
 - [x] Local follow-up: compatible meld previews/approach areas, prominent turn band, and staged opponent moves
-- [ ] Publish the interaction follow-up after local review
+- [x] Interaction follow-up published on 2026-09-22 (`1f5f822`)
 - [ ] Physical-phone playtesting of touch feel, rotation, safe areas, and browser bars
 - [ ] Optional future work: tap-to-hurry AI turns and the deferred cleanup items below
 
@@ -75,6 +75,15 @@ The realistic finish started behind `?tiles=realistic`, then became the default.
 The earlier optional cleanup list remains: deduplicate meld insertion logic; use `MotionConfig reducedMotion="user"`; guard localStorage access; guard `handleDraw` against an empty pool internally; broaden a few engine edge-case tests; use a monotonic split-ID counter; remove redundant `deal` state. These were not part of this release.
 
 ## 5. Changelog
+
+### 2026-09-22 — larger table, automatic framing and run extraction
+
+- Compact phone header, player strip and controls add 57px of felt in portrait while retaining the rack’s tile rows.
+- Auto fit is the default: all occupied tiles remain visible after moves and resizing, with framing deferred during player drags. Free pan remains available.
+- The virtual table follows the screen’s aspect ratio. New AI groups use available width, preventing tall stacks that force excessive zooming out; existing player positions stay intact where space permits.
+- Removing a middle tile from a valid run separates the remaining stretches for felt drops, joins and rack returns. Short halves stay incomplete until repaired; Undo and Take back restore the full prior state.
+- Dark navy YOUR TURN banner and header, gold marker and rack outline replace the pale turn treatment.
+- Validation: 82 unit tests and production build; browser checks for crowded automatic framing without Fit in four phone viewports, later additions, touch extraction and recovery, manual pan recovery, opponent travel and reset.
 
 ### 2026-09-09 — single-tile pickup, stricter joining and clear controls (local)
 

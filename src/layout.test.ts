@@ -1,11 +1,51 @@
 import { describe, expect, it } from "vitest";
 import { BoardGroup, tile } from "./game";
-import { positionTableGroups, tableFootprint } from "./layout";
+import { BoardCamera, fitTableCamera, positionTableGroups, tableBounds, tableFootprint } from "./layout";
 
 const meld = (id: string, size: number): BoardGroup => ({
   id,
   kind: "run",
   tiles: Array.from({ length: size }, (_, index) => tile(`${id}-${index}`, index + 1, "cobalt")),
+});
+
+describe("automatic table framing", () => {
+  it("uses the width of a short screen to keep crowded tiles larger", () => {
+    const stage = { width: 519, height: 107 };
+    const groups = Array.from({ length: 13 }, (_, i) => meld(`g${i}`, 4));
+    const positions = positionTableGroups(groups, {}, stage);
+    const camera = fitTableCamera(tableBounds(groups, positions, stage), stage, { x: 0, y: 6, zoom: 0.58 }, true);
+    expect(camera.zoom).toBeGreaterThan(0.25);
+  });
+  it.each([{ width: 390, height: 434 }, { width: 320, height: 158 }, { width: 696, height: 170 }])("keeps successive additions visible without Fit at %o", (stage) => {
+    let camera: BoardCamera = { x: 0, y: 6, zoom: 0.58 };
+    let positions = {};
+    for (let count = 1; count <= 16; count++) {
+      const groups = Array.from({ length: count }, (_, i) => meld(`g${i}`, 4));
+      positions = positionTableGroups(groups, positions, stage);
+      const bounds = tableBounds(groups, positions, stage)!;
+      camera = fitTableCamera(bounds, stage, camera);
+      expect(bounds.left * camera.zoom + camera.x).toBeGreaterThanOrEqual(11.9);
+      expect(bounds.right * camera.zoom + camera.x).toBeLessThanOrEqual(stage.width - 11.9);
+      expect(bounds.top * camera.zoom + camera.y).toBeGreaterThanOrEqual(11.9);
+      expect(bounds.bottom * camera.zoom + camera.y).toBeLessThanOrEqual(stage.height - 11.9);
+    }
+  });
+  it("keeps a visible layout steady and pans before making tiles smaller", () => {
+    const camera = { x: 0, y: 6, zoom: 0.58 };
+    const bounds = { left: 30, right: 300, top: 50, bottom: 400 };
+    expect(fitTableCamera(bounds, rect, camera)).toBe(camera);
+    const moved = fitTableCamera({ ...bounds, bottom: 950 }, rect, camera);
+    expect(moved.zoom).toBeLessThan(camera.zoom);
+    const shifted = fitTableCamera({ ...bounds, top: 550, bottom: 950 }, rect, camera);
+    expect(shifted.zoom).toBe(camera.zoom);
+    expect(shifted.y).toBeLessThan(camera.y);
+  });
+  it("restores readable size when a taller viewport becomes available", () => {
+    const camera = { x: 0, y: 6, zoom: 0.1 };
+    const bounds = { left: 10, right: 500, top: 20, bottom: 500 };
+    expect(fitTableCamera(bounds, rect, camera, true).zoom).toBe(0.58);
+    expect(fitTableCamera(null, rect, camera)).toBe(camera);
+  });
 });
 const rect = { width: 390, height: 520 };
 

@@ -22,7 +22,7 @@ Run `npm test` and `npm run build` first. Start the local preview with `npm run 
 
 ## Turn and opponent feedback
 
-- Your turn has a blue banner beside the rack and a matching header; both timers agree. Opponent turns use a quieter band naming the active player and current action.
+- Your turn has a dark navy banner and header, uppercase YOUR TURN with a gold marker, and an outlined rack; both timers agree. Opponent turns use a quieter band naming the active player and current action.
 - Opponents visibly pick up and drag one face-down tile at a time from their seat to the actual board destination; rack counts decrease as tiles land. During pickup and travel, neither the floating tile nor its blank destination may render a number or colour marker. The face appears only after landing. New additions remain highlighted through your next turn. Draws show only the tile back.
 - Sort repeatedly during opponents: their sequence must not restart. Your full minute starts only after Maya’s last placement and summary settle.
 - With reduced motion enabled, preserve staged placement and highlights without flying tiles.
@@ -38,7 +38,7 @@ Run `npm test` and `npm run build` first. Start the local preview with `npm run 
 ## Viewports and keyboard
 
 - Check 390×844 and 375×667 portrait, then rotate to 844×390 and 667×375 landscape. Keep the table, rack tools, players and turn actions visible. Recheck on a real phone with browser bars and safe-area insets.
-- Toggle Pan on/off: group positions stay unchanged. Pan, pinch, and Fit continue to work. Buttons must not pan the table or place a selection accidentally.
+- Toggle Auto fit / Free pan: group positions stay unchanged. Free pan permits manual exploration; returning to Auto fit brings all tiles back into view. Buttons must not pan the table or place a selection accidentally.
 - Tab to a rack tile, press Space to pick it up, use arrows to move, then Space to drop or Escape to cancel. Check visible keyboard focus on sorting and camera controls.
 
 ## Verified in the 2026-09-07 session
@@ -67,3 +67,11 @@ Latest pro-feedback follow-up: 67 tests and production build passed. Determinist
 - With 52 tiles in play, Fit must show every tile inside the playable surface, with groups kept separate even on short screens. Camera, sound and Take back controls must remain in their own strip outside the clipped table, without overlapping each other at 390×844, 320×568, 844×390 and 667×375.
 - Drop a rack tile onto the control strip: it must stay in the rack. Fit and Pan still work, and Take back must restore the board after rearrangements.
 - 71 unit tests and production build passed. Browser checks covered delayed single pickup, duplicate and gap rejection from rack/board, incompatible rack batches, valid incremental runs, Take back, and the crowded-table strip.
+
+## 2026-09-22 tester follow-up
+
+- Do not press Fit: all 52 tiles must stay within the felt at 390×844, 320×568, 844×390 and 667×375. Place another run near an edge and check all 55 tiles remain visible. Buttons stay outside the felt and do not overlap.
+- New unpositioned groups use the screen’s width. The virtual world follows the stage’s aspect ratio, so short screens do not force a tall column of groups. Explicit placements still stay near the requested point.
+- Remove blue 4 from 1–7: get separate 1–3 and 5–7 runs, whether the 4 goes onto empty felt, onto a set of fours, or onto its end target. Check conservation, Undo and Take back. Return this turn’s blue 6 from 4–8 to the rack: get separate 4–5 and 7–8 drafts that cannot be committed yet.
+- Automatic framing waits until a player’s drag finishes. Opponent pickups remain face-down and land at the current target; resetting during flight cancels the sequence.
+- Verified: 82 unit tests and production build; touch extraction, rack return, explicit end joins, recovery, automatic framing after additions and resizing, Free pan recovery, opponent flight and reset. The compact portrait layout adds 57px of felt without shrinking rack rows.
