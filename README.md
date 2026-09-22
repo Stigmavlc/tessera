@@ -30,13 +30,13 @@ The shelf construction is inspired by [physical Rummikub rack reference photos](
 - Collision-aware meld placement that keeps player and AI groups from visually overlapping
 - Larger virtual tabletop; switch to the free camera for one-finger/mouse-drag panning, pinch/wheel zoom, and Fit recovery
 - Tap to select rack tiles, or hold a tile to progressively select tiles to its right; drag the batch as one move
-- Compatible melds show insertion previews and generous end targets; nearby drops along the same row attach automatically, while empty space below remains available for separate groups
+- Compatible melds, including unfinished pairs, show insertion previews and generous end targets; nearby taps and drags use the same association rules; nearby drops along the same row attach automatically, while empty space below remains available for separate groups
 - Precise pointer-based drop targets, with a drag preview that matches the tile size on the board
 - Incompatible rack additions leave complete melds intact; incomplete drafts and deliberate run splits remain supported
 - Drop a duplicate tile mid-run to split it into two melds, exactly like the boxed rules
-- Drag a run's tail (a tile plus everything right of it) as one stack; sets and invalid drafts still drag one tile at a time
+- A board drag always moves one tile, even after holding; multi-tile rack selection remains available
 - Split a table meld by dragging a tile onto empty felt, then recombine it by dropping onto another tile or meld
-- Permissive table drafting while arranging, with strict legality enforced when the turn is committed
+- Reject duplicate colours/numbers and unfilled run gaps when joining tiles; allow compatible pairs while building, and temporary incomplete groups after extracting tiles, with full legality checked at commit
 - Return any rack tile played this turn using its table remove control or by dragging it back
 - Numeric draft ordering and tile-level drop targets for table repositioning
 - Visible 789 (colour, then number) and 777 (number, then colour) rack sorting buttons, available during every player’s turn
@@ -57,6 +57,7 @@ The shelf construction is inspired by [physical Rummikub rack reference photos](
 - High-contrast tile colours reinforced with distinct geometric markers
 - Plain textured felt with a subtle embossed Tessera mark, without dot patterns or corner guides
 - Rack-empty victory, final scoring, and instant replay
+- Table controls occupy a separate strip outside the tile surface, so even crowded boards cannot cover them
 - Camera locked by default, with pan/pinch/zoom one tap away and Fit always available; locking the camera preserves your group positions
 - Sound/haptics settings sheet and table reset
 - Responsive portrait and full-width mobile landscape play, with a framed desktop presentation and safe-area spacing

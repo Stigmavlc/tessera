@@ -4,14 +4,22 @@ export type TablePoint = { x: number; y: number };
 export type TablePositions = Record<string, TablePoint>;
 export type BoardCamera = { x: number; y: number; zoom: number };
 
+// Keep enough movable table space when the phone rotates or browser bars
+// reduce its height. Match the minimum dimensions on .board-world.
+export const tableWorldSize = (stage: { width: number; height: number }) => ({
+  width: Math.max(680, stage.width * 1.7),
+  height: Math.max(960, stage.height * 1.7),
+});
+
 // Match the fixed world-space tile sizes in .board-world. Unlike a percentage
 // estimate, this also keeps groups apart on a short, wide landscape board.
 export function tableFootprint(tileCount: number, stage: { width: number; height: number }) {
   const tileWidth = tileCount >= 11 ? 29 : tileCount >= 8 ? 34 : 46;
   const gap = tileCount >= 11 ? 1 : tileCount >= 8 ? 2 : 3;
+  const world = tableWorldSize(stage);
   return {
-    width: (tileCount * tileWidth + Math.max(0, tileCount - 1) * gap + 14) / (stage.width * 1.7) * 100,
-    height: 80 / (stage.height * 1.7) * 100,
+    width: (tileCount * tileWidth + Math.max(0, tileCount - 1) * gap + 14) / world.width * 100,
+    height: 80 / world.height * 100,
   };
 }
 
@@ -19,6 +27,7 @@ export function positionTableGroups(
   groups: BoardGroup[], current: TablePositions,
   stage: { width: number; height: number }, movedId?: string,
 ): TablePositions {
+  const world = tableWorldSize(stage);
   const positions: TablePositions = {};
   const placed: Array<{ point: TablePoint; size: ReturnType<typeof tableFootprint> }> = [];
   const occupied = groups.filter((group) => group.tiles.length > 0)
@@ -43,8 +52,8 @@ export function positionTableGroups(
     for (let y = size.height / 2 + 1; y <= 99 - size.height / 2; y += 2) {
       for (let x = size.width / 2 + 1; x <= 99 - size.width / 2; x += 2) candidates.push({ x, y });
     }
-    candidates.sort((a, b) => Math.hypot((a.x - desired.x) * stage.width, (a.y - desired.y) * stage.height)
-      - Math.hypot((b.x - desired.x) * stage.width, (b.y - desired.y) * stage.height));
+    candidates.sort((a, b) => Math.hypot((a.x - desired.x) * world.width, (a.y - desired.y) * world.height)
+      - Math.hypot((b.x - desired.x) * world.width, (b.y - desired.y) * world.height));
     const point = candidates.find(isOpen) ?? desired;
     positions[group.id] = point;
     placed.push({ point, size });

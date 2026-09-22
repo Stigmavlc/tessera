@@ -12,6 +12,7 @@ import {
   createDeal,
   extendMeldAtEnd,
   initialBoard,
+  isCompatibleMeldDraft,
   isValidBoard,
   moveBoardTile,
   moveBoardTiles,
@@ -514,6 +515,32 @@ describe("scoreStalemate", () => {
 
 describe("approaching a meld from either end", () => {
   const blue = group("blue", [5, 6, 7, 8].map((n) => tile(`b${n}`, n, "cobalt")));
+  it("builds an opening trio one tile at a time without treating a pair as legal", () => {
+    const first = group("tens", [tile("b10", 10, "cobalt")]);
+    const pair = extendMeldAtEnd(first, [tile("k10", 10, "graphite")], "right")!;
+    expect(pair.map((t) => t.id)).toEqual(["b10", "k10"]);
+    expect(analyzeMeld(pair).valid).toBe(false);
+    const trio = extendMeldAtEnd(group("tens", pair), [tile("y10", 10, "marigold")], "right")!;
+    expect(analyzeMeld(trio)).toMatchObject({ valid: true, score: 30 });
+  });
+  it("previews compatible incomplete runs but refuses unrelated pairs", () => {
+    const first = group("single", [tile("b8", 8, "cobalt")]);
+    expect(extendMeldAtEnd(first, [tile("b7", 7, "cobalt")], "left")?.map((t) => t.value)).toEqual([7, 8]);
+    expect(extendMeldAtEnd(first, [tile("b7", 7, "cobalt")], "right")).toBeNull();
+    expect(extendMeldAtEnd(first, [tile("r7", 7, "terracotta")], "left")).toBeNull();
+    expect(extendMeldAtEnd(first, [tile("b8-copy", 8, "cobalt")], "right")).toBeNull();
+  });
+  it("can extract just the first tile and combine it with two other sevens", () => {
+    const black = group("black", [7, 8, 9, 10].map((n) => tile(`k${n}`, n, "graphite")));
+    const yellow = group("yellow", [7, 8, 9, 10].map((n) => tile(`y${n}`, n, "marigold")));
+    const seven = group("sevens", [tile("b7", 7, "cobalt")]);
+    const withBlack = moveBoardTiles([black, yellow, seven], ["k7"], "black", "sevens");
+    const complete = moveBoardTiles(withBlack, ["y7"], "yellow", "sevens");
+    expect(complete[0].tiles.map((t) => t.value)).toEqual([8, 9, 10]);
+    expect(complete[1].tiles.map((t) => t.value)).toEqual([8, 9, 10]);
+    expect(complete[2].tiles.map((t) => t.value)).toEqual([7, 7, 7]);
+    expect(isValidBoard(complete)).toBe(true);
+  });
   it("places blue 4 before 5–6–7–8 and blue 9 after it", () => {
     expect(extendMeldAtEnd(blue, [tile("b4", 4, "cobalt")], "left")?.map((t) => t.value)).toEqual([4, 5, 6, 7, 8]);
     expect(extendMeldAtEnd(blue, [tile("b9", 9, "cobalt")], "right")?.map((t) => t.value)).toEqual([5, 6, 7, 8, 9]);
@@ -536,5 +563,21 @@ describe("approaching a meld from either end", () => {
     const set = group("s", [tile("r7", 7, "terracotta"), tile("y7", 7, "marigold"), tile("k7", 7, "graphite")]);
     expect(extendMeldAtEnd(set, [tile("b7", 7, "cobalt")], "left")?.[0].id).toBe("b7");
     expect(extendMeldAtEnd(set, [tile("b7", 7, "cobalt")], "right")?.at(-1)?.id).toBe("b7");
+  });
+});
+
+describe("joining compatible drafts", () => {
+  it("rejects duplicate same-colour tiles and missing run numbers immediately", () => {
+    expect(isCompatibleMeldDraft([tile("a", 4, "graphite"), tile("b", 4, "graphite")])).toBe(false);
+    expect(isCompatibleMeldDraft([tile("a", 1, "cobalt"), tile("b", 3, "cobalt")])).toBe(false);
+    expect(isCompatibleMeldDraft([tile("a", 1, "cobalt"), tile("b", 2, "cobalt"), tile("c", 4, "cobalt")])).toBe(false);
+    expect(isCompatibleMeldDraft([tile("a", 1, "cobalt"), tile("b", 2, "graphite")])).toBe(false);
+  });
+  it("allows adjacent pairs, different-colour sets, and repairing a gap with a joker", () => {
+    expect(isCompatibleMeldDraft([tile("a", 4, "graphite"), tile("b", 4, "cobalt")])).toBe(true);
+    expect(isCompatibleMeldDraft([tile("a", 2, "cobalt"), tile("b", 1, "cobalt")])).toBe(true);
+    expect(isCompatibleMeldDraft([tile("a", 1, "cobalt"), tile("j", "★", "joker"), tile("b", 3, "cobalt")])).toBe(true);
+    const one = tile("a", 4, "graphite");
+    expect(isCompatibleMeldDraft([one, one])).toBe(false);
   });
 });

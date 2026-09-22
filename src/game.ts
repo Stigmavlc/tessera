@@ -194,6 +194,18 @@ export function isValidBoard(groups: BoardGroup[]): boolean {
   return groups.every((group) => analyzeMeld(group.tiles).valid);
 }
 
+// Placement may build a single or adjacent pair, but never join a duplicate
+// or gap. Removing tiles can still leave incomplete groups to repair later.
+export function isCompatibleMeldDraft(tiles: Tile[]): boolean {
+  if (new Set(tiles.map((tile) => tile.id)).size !== tiles.length) return false;
+  if (tiles.length < 2) return true;
+  if (tiles.length > 2) return analyzeMeld(tiles).valid;
+  const [a, b] = tiles;
+  if (a.color === "joker" || b.color === "joker") return true;
+  return (a.value === b.value && a.color !== b.color)
+    || (a.color === b.color && Math.abs(Number(a.value) - Number(b.value)) === 1);
+}
+
 export function orderMeldTiles(tiles: Tile[]): Tile[] {
   const analysis = analyzeMeld(tiles);
   if (!analysis.valid) {
@@ -247,6 +259,15 @@ export function extendMeldAtEnd(group: BoardGroup, moving: Tile[], side: MeldSid
   if (moving.some((tile) => heldIds.has(tile.id))) return null;
   const orderedMoving = orderMeldTiles(moving);
   const candidate = side === "left" ? [...orderedMoving, ...group.tiles] : [...group.tiles, ...orderedMoving];
+  // Two compatible tiles are a useful draft, even though committing still
+  // requires at least three. This lets a player build melds one tile at a time.
+  if (candidate.length === 2) {
+    const [a, b] = candidate;
+    if (a.color === "joker" || b.color === "joker") return candidate;
+    const pair = a.value === b.value && a.color !== b.color;
+    const run = a.color === b.color && Number(b.value) === Number(a.value) + 1;
+    return pair || run ? candidate : null;
+  }
   const analysis = analyzeMeld(candidate);
   if (!analysis.valid) return null;
   if (analysis.type === "set") return candidate;

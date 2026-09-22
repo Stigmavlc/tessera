@@ -593,10 +593,12 @@ button:focus-visible,
 /* Tile ink colours are deliberately farther apart than the app palette:
    terracotta reads as unmistakable red, marigold as golden yellow —
    players confused the two when both leaned orange. */
-.tile--terracotta { color: #c51b26; }
-.tile--cobalt { color: #0059d6; }
-.tile--marigold { color: #946000; }
-.tile--graphite { color: #171d28; }
+.tile--terracotta { color: #df1527; }
+.tile--cobalt { color: #005bea; }
+.tile--marigold { color: #ecad00; }
+.tile--graphite { color: #101723; }
+.tile--marigold .tile__number { -webkit-text-stroke: .35px #956600; }
+
 .tile--joker .tile__number { font-size: 25px; }
 .tile--terracotta .tile__pip { border-radius: 50%; }
 .tile--cobalt .tile__pip { border-radius: 1px; }
@@ -895,8 +897,8 @@ button:focus-visible,
   top: 0;
   left: 0;
   z-index: 2;
-  width: 170%;
-  height: 170%;
+  width: max(170%, 680px);
+  height: max(170%, 960px);
   transform-origin: 0 0;
   will-change: transform;
 }
@@ -946,6 +948,10 @@ button:focus-visible,
 
 .meld {
   position: relative;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
   display: flex;
   min-width: 0;
   min-height: 72px;
@@ -1782,7 +1788,7 @@ button:focus-visible,
   .turn-title strong { font-size: 16px; }
   .turn-title__eyebrow { font-size: 7px; }
   .timer { width: 40px; border-width: 2px; font-size: 12px; }
-  .board-stage { grid-column: 1; grid-row: 2; }
+  .board-area { grid-column: 1; grid-row: 2; }
   .player-rail { grid-column: 2; grid-row: 2; grid-template-columns: 1fr; align-content: center; gap: 0; padding: 0 7px; border-left: 1px solid var(--line); }
   .rail-player { padding: 3px; gap: 5px; }
   .rail-player .avatar { width: 28px; flex-basis: 28px; }
@@ -1861,3 +1867,14 @@ button:focus-visible,
   .turn-banner strong { font-size: 13px; }
   .turn-banner > span { font-size: 9px; }
 }
+
+/* Keep camera controls outside the measured, clipped tile surface. */
+.board-area { min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) 42px; }
+.board-toolbar { display: flex; align-items: center; gap: 5px; padding: 4px 6px; background: #526641; }
+.board-toolbar .board-fit-button, .board-toolbar .board-lock-button { position: static; flex: 0 0 auto; min-height: 32px; }
+
+.board-toolbar .board-takeback-button { position: static; flex: 0 0 auto; min-height: 32px; padding: 0 7px; font-size: 10px; }
+.board-toolbar .board-audio { position: static; gap: 4px; margin-right: auto; }
+.board-toolbar .audio-toggle { width: 32px; height: 32px; }
+.board-toolbar .board-lock-button { order: 3; }
+.board-toolbar .board-fit-button { order: 4; }

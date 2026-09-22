@@ -76,6 +76,23 @@ The earlier optional cleanup list remains: deduplicate meld insertion logic; use
 
 ## 5. Changelog
 
+### 2026-09-09 — single-tile pickup, stricter joining and clear controls (local)
+
+- Removed board long-hold run pickup: a drag always takes one tile. This supersedes the September 7 hold-to-move-run interaction; rack batch selection is unchanged.
+- Moved Fit, Pan, sound and Take back into a separate strip outside the measured tile surface, including in landscape.
+- Kept a minimum virtual-table area so a short viewport does not pile up crowded groups; Fit now frames the occupied groups instead of merely resetting to the default zoom.
+- Refuse incompatible joins immediately from either rack or board, including duplicate black 4s and a 1–3 gap. Refuse incompatible new rack batches. Compatible pairs, joker-filled runs and valid incremental construction still work.
+- Removing a tile may leave an incomplete source group while preparing a turn; final validation and Take back remain intact.
+- Verified 71 tests/build and touch browser scenarios, including a crowded 52-tile board across four phone sizes. Changes remain local pending publication.
+
+### 2026-09-07 — pro-player video feedback (local)
+
+- Reviewed the supplied 53-second gameplay video and opening-tens screenshot. Automatic run-tail pickup was preventing individual sevens from being extracted; nearby association was also excluding two-tile drafts.
+- Ordinary board drags now move one tile. A deliberate 450 ms hold retains optional run-tail movement, with a visible count.
+- Compatible pairs can be assembled one tile at a time; nearby taps use the same association as drags. Commit still requires complete melds and the opening score.
+- Replaced the brown-looking number colour with brighter yellow and a fine darker edge; strengthened red/blue and retained deep black and shape markers. Removed native tap highlighting over table tiles.
+- Verified 67 tests/build and touch reproduction of the tens and sevens scenarios, deliberate hold, subsequent single drag, and Take back.
+
 ### 2026-09-07 — interaction follow-up (local, not yet published)
 
 - Added compatible-meld insertion previews, broad left/right targets, and selective nearby association. Verified blue 4 joins blue 5–8 even from an approximate drop; a new trio below stays separate. Explicit side targets preserve joker/end placement.

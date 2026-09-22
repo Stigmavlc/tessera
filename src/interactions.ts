@@ -12,22 +12,27 @@ const priority = (id: string | number) => {
   return 3;
 };
 
+export function approachedMeld(point: TablePoint, groups: { id: string; rect: { left: number; right: number; top: number; bottom: number } }[]): string | null {
+  return groups.flatMap(({ id, rect }) => {
+    const dx = Math.max(rect.left - point.x, point.x - rect.right, 0);
+    const dy = Math.max(rect.top - point.y, point.y - rect.bottom, 0);
+    return dx <= 40 && dy <= 10 ? [{ id, distance: Math.hypot(dx, dy * 3) }] : [];
+  }).sort((a, b) => a.distance - b.distance)[0]?.id ?? null;
+}
+
 // A generous horizontal approach lane belongs only to a compatible meld.
 // Keep the vertical tolerance narrow so a new group below stays independent.
 export const tabletopCollision: CollisionDetection = (args) => {
   if (!args.pointerCoordinates) return closestCenter(args);
   const hits = pointerWithin(args).sort((a, b) => priority(a.id) - priority(b.id));
   if (hits[0]?.id !== "board-drop") return hits;
-  const pointer = args.pointerCoordinates;
-  const nearby = args.droppableContainers.flatMap((container) => {
+  const nearby = approachedMeld(args.pointerCoordinates, args.droppableContainers.flatMap((container) => {
     if (!String(container.id).startsWith("group:") || !container.data?.current?.canAccept) return [];
     const rect = args.droppableRects.get(container.id);
     if (!rect) return [];
-    const dx = Math.max(rect.left - pointer.x, pointer.x - rect.right, 0);
-    const dy = Math.max(rect.top - pointer.y, pointer.y - rect.bottom, 0);
-    return dx <= 40 && dy <= 10 ? [{ id: container.id, distance: Math.hypot(dx, dy * 3) }] : [];
-  }).sort((a, b) => a.distance - b.distance);
-  return nearby.length ? [{ id: nearby[0].id }, ...hits] : hits;
+    return [{ id: String(container.id), rect }];
+  }));
+  return nearby ? [{ id: nearby }, ...hits] : hits;
 };
 
 export function pointerPosition(event: Event): TablePoint | null {

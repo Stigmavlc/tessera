@@ -4,13 +4,18 @@ Run `npm test` and `npm run build` first. Start the local preview with `npm run 
 
 ## Touch and mouse
 
+- Also check black 7–8–9: removing 7 must leave an editable 8–9 draft. Join the extracted sevens, then add black 10 to repair the pair before committing.
+- Drag the first 7 from a black 7–8–9–10 run onto empty felt: only 7 moves. Repeat with a yellow 7 and join with a blue rack 7. The remaining 8–9–10 runs stay intact. Undo and Take back restore all tiles and positions.
+- Hold a board tile for 850 ms, then drag: only that tile moves. Repeat with immediate dragging and keyboard pickup. No group-selection badge should appear. Rack hold-to-select still works.
+- Place tens separately; drag one near another to build a pair, then select the third and tap nearby. The pair remains an illegal draft; the trio is legal for a 30-point opening. A distinct group below stays separate.
+
 - Tap tiles quickly: each tap toggles its selection once. Clear removes the selection.
 - Hold a rack tile still: after 300 ms it selects, then selection extends right every 180 ms. Release without dragging: selection remains. Moving more than 4 px starts dragging and stops extending the selection.
 - Hold until three tiles are selected, then drag without lifting your finger. All three should move together. Cancel, release outside the table/rack, or switch away from the browser: selection must stop growing.
 - Drop a trio onto empty felt below an existing trio. It stays separate at the pointer position. Dropping outside the table must not target the closest group.
 - With blue 5–8 on the table and blue 4 selected, the left insertion preview appears. Drag within 30–40 px of the other end: it still joins at the legal end. Select blue 9 and tap the right preview: it appends. Check both mouse and touch, batch extensions, jokers, zoom, and keyboard activation. Before opening, previews must only appear on your own opening drafts.
 - The drag preview shrinks over the board, stays centred under the pointer, and matches regular or compressed target tiles.
-- Drop an incompatible rack tile directly onto a complete meld: the rack and meld remain unchanged. Place it on empty felt to start a separate draft. Valid extensions and duplicate-run splits still work.
+- Drop an incompatible rack or board tile onto a complete or incomplete meld: both source and destination remain unchanged. In particular reject two black 4s, blue 1+3, and 1+2+4. Reject incompatible rack batches on empty felt too. Adjacent pairs and 1+2+3 still work. Place it on empty felt to start a separate draft. Valid extensions and duplicate-run splits still work.
 - Move board tiles onto empty felt, deliberately extend other melds, return this turn’s tiles, and Undo. End Turn still enforces opening points, legal melds, and table conservation.
 - Use Take back after playing several tiles and splitting an existing table group. All groups and positions must return to the turn’s starting state, with this turn’s rack tiles returned. The current rack sorting stays; no tile is drawn and the clock continues. Selection and Undo history clear. Take back is disabled before any table changes and during opponents’ turns.
 - After taking back, start another draft or End Turn to draw exactly one tile. Check that the embossed logo does not intercept taps or drops and that there are no white dots or corner guides.
@@ -54,3 +59,11 @@ Run `npm test` and `npm run build` first. Start the local preview with `npm run 
 - After pushing an app update, verify that the Pages workflow succeeded for the exact pushed commit, then open the original personalised link in a fresh browser. An already-open game may need refreshing.
 
 Local `.playwright-mcp/` scripts/screenshots are ignored diagnostic artifacts; the scenarios in this document are the durable checklist.
+
+Latest pro-feedback follow-up: 67 tests and production build passed. Deterministic touch browser checks reproduced individual-tile extraction, two-stage pair/trio building by drag and tap, valid remaining runs, deliberate hold-to-carry, and Take back. Brighter yellow/red/blue and black were visually inspected.
+
+## 2026-09-09 follow-up
+
+- With 52 tiles in play, Fit must show every tile inside the playable surface, with groups kept separate even on short screens. Camera, sound and Take back controls must remain in their own strip outside the clipped table, without overlapping each other at 390×844, 320×568, 844×390 and 667×375.
+- Drop a rack tile onto the control strip: it must stay in the rack. Fit and Pan still work, and Take back must restore the board after rearrangements.
+- 71 unit tests and production build passed. Browser checks covered delayed single pickup, duplicate and gap rejection from rack/board, incompatible rack batches, valid incremental runs, Take back, and the crowded-table strip.

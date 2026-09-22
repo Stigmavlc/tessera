@@ -10,6 +10,15 @@ const meld = (id: string, size: number): BoardGroup => ({
 const rect = { width: 390, height: 520 };
 
 describe("free table placement", () => {
+  it.each([{ width: 320, height: 100 }, { width: 519, height: 95 }])("keeps a crowded 52-tile table separated at %o", (stage) => {
+    const groups = Array.from({ length: 13 }, (_, i) => meld(`set-${i}`, 4));
+    const positions = positionTableGroups(groups, {}, stage);
+    const size = tableFootprint(4, stage);
+    for (let i = 0; i < groups.length; i++) for (let j = i + 1; j < groups.length; j++) {
+      const a = positions[groups[i].id], b = positions[groups[j].id];
+      expect(Math.abs(a.x - b.x) >= size.width || Math.abs(a.y - b.y) >= size.height).toBe(true);
+    }
+  });
   it("is deterministic, keeps groups inside the world, and preserves positions when appending", () => {
     const groups = [meld("a", 3), meld("b", 4), meld("c", 5)];
     const positions = positionTableGroups(groups, {}, rect);
